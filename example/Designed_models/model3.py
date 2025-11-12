@@ -403,7 +403,7 @@ def evaluate_model(model, test_loader, device, aux_weight=0.1, l2_weight=1e-4):
             predicted_expr, delta_expr, pert_pred = model(
                 x_baseline, pert, time_emb)
 
-            # 计算损失
+            # Compute losses
             main_loss = F.mse_loss(predicted_expr, x_target)
             aux_loss = F.mse_loss(pert_pred, pert)
 
@@ -416,7 +416,7 @@ def evaluate_model(model, test_loader, device, aux_weight=0.1, l2_weight=1e-4):
 
             total_loss += loss.item()
 
-            # 计算指标
+            # Compute metrics
             r2 = r2_score(x_target.cpu().numpy(), predicted_expr.cpu().numpy())
             total_r2 += r2
             pearson = np.mean([pearsonr(x_target[i].cpu().numpy(), predicted_expr[i].cpu().numpy())[0]
@@ -435,12 +435,12 @@ def evaluate_model(model, test_loader, device, aux_weight=0.1, l2_weight=1e-4):
 
 def calculate_metrics(pred, true):
     """Calculate 6 evaluation metrics"""
-    # pred, true: [样本数, 基因数]
+    # pred, true: [num_samples, num_genes]
     mse = np.mean((pred - true) ** 2)
     pcc = np.mean([pearsonr(p, t)[0] for p, t in zip(pred.T, true.T)])
     r2 = np.mean([r2_score(t, p) for p, t in zip(pred.T, true.T)])
 
-    # Differentially expressed genes (DE): Expression change exceeds 1 standard deviation
+    # Differentially expressed genes (DE): identify genes whose change exceeds 1 standard deviation
     std = np.std(true, axis=0)
     de_mask = np.abs(true - np.mean(true, axis=0)) > std
     if np.any(de_mask):
@@ -540,9 +540,9 @@ def evaluate_and_save_model(model, test_loader, device, save_path,
 def objective(trial, timestamp):
     global train_dataset, test_dataset, device, pca_model
 
-    # 超参数搜索空间
+    # Hyperparameter search space
     params = {
-        'pca_dim': 128,  # 固定PCA维度
+        'pca_dim': 128,  # Fixed PCA dimension
         'hidden_dim': trial.suggest_categorical('hidden_dim', [256, 512, 768]),
         'n_layers': trial.suggest_int('n_layers', 2, 6),
         'n_heads': trial.suggest_categorical('n_heads', [4, 8, 16]),
@@ -554,7 +554,7 @@ def objective(trial, timestamp):
         'use_attention': trial.suggest_categorical('use_attention', [True, False])
     }
 
-    # 创建模型
+    # Create model
     model = CytokineTransformerModel(
         input_dim=128,
         pert_dim=train_dataset.perturbations.shape[1],
@@ -679,7 +679,7 @@ def objective(trial, timestamp):
 def main(gpu_id=None):
     global train_adata, train_dataset, test_dataset, device, pca_model
 
-    # 生成时间戳用于文件命名
+    # Generate timestamp for file naming
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     print(f'Training started at: {timestamp}')
 
@@ -690,16 +690,17 @@ def main(gpu_id=None):
         for i in range(gpu_count):
             print(f'GPU {i}: {torch.cuda.get_device_name(i)}')
 
-        # 选择GPU
+        # Select GPU
         if gpu_id is not None:
             if gpu_id >= gpu_count:
-                print(f'警告: 指定的GPU {gpu_id} 不存在，使用GPU 0')
+                print(
+                    f'Warning: specified GPU {gpu_id} not available, using GPU 0')
                 gpu_id = 0
             device = torch.device(f'cuda:{gpu_id}')
-            print(f'使用指定的GPU {gpu_id}: {device}')
+            print(f'Using requested GPU {gpu_id}: {device}')
         else:
             device = torch.device('cuda:0')
-            print(f'使用默认GPU 0: {device}')
+            print(f'Using default GPU 0: {device}')
     else:
         device = torch.device('cpu')
         print('CUDA not available, using CPU')
@@ -719,28 +720,28 @@ def main(gpu_id=None):
     print(f'Training data shape: {train_adata.shape}')
     print(f'Test data shape: {test_adata.shape}')
 
-    # 确保训练集和测试集使用相同的基因集合
-    print("处理基因集合一致性...")
+    # Ensure training and test sets share the same gene set
+    print("Ensuring consistent gene sets...")
     train_genes = set(train_adata.var_names)
     test_genes = set(test_adata.var_names)
     common_genes = list(train_genes & test_genes)
-    print(f"训练集基因数: {len(train_genes)}")
-    print(f"测试集基因数: {len(test_genes)}")
-    print(f"共同基因数: {len(common_genes)}")
+    print(f"Training gene count: {len(train_genes)}")
+    print(f"Test gene count: {len(test_genes)}")
+    print(f"Common gene count: {len(common_genes)}")
 
-    # 按共同基因排序，确保顺序一致
+    # Sort common genes to ensure consistent ordering
     common_genes.sort()
 
-    # 获取共同基因的索引
+    # Gather indices for the common genes
     train_gene_idx = [train_adata.var_names.get_loc(
         gene) for gene in common_genes]
     test_gene_idx = [test_adata.var_names.get_loc(
         gene) for gene in common_genes]
 
-    # 创建PCA模型
+    # Create PCA model
     pca_model = PCA(n_components=128)
 
-    # 先对训练数据进行预处理（只使用共同基因）
+    # Preprocess training data (common genes only)
     if scipy.sparse.issparse(train_adata.X):
         train_data = train_adata.X[:, train_gene_idx].toarray()
     else:
@@ -749,16 +750,16 @@ def main(gpu_id=None):
     train_data = np.maximum(train_data, 1e-10)
     train_data = np.log1p(train_data)
 
-    # 使用StandardScaler进行标准化
+    # Standardize with StandardScaler
     scaler = StandardScaler()
     train_data = scaler.fit_transform(train_data)
     train_data = np.clip(train_data, -10, 10)
     train_data = train_data / 10.0
 
-    # 对训练数据拟合PCA模型
+    # Fit PCA model on training data
     pca_model.fit(train_data)
 
-    # 保存共同基因信息
+    # Save metadata for common genes
     common_genes_info = {
         'genes': common_genes,
         'train_idx': train_gene_idx,
@@ -860,7 +861,7 @@ def main(gpu_id=None):
     print('Training final model...')
     best_loss = float('inf')
     best_model = None
-    max_epochs = 120  # 增加训练轮数
+    max_epochs = 120  # Increase number of epochs
 
     for epoch in range(max_epochs):
         train_loss = train_model(final_model, train_loader, optimizer, scheduler, device,
@@ -920,42 +921,42 @@ def main(gpu_id=None):
 
 def load_model_for_analysis(model_path, device='cuda'):
     """
-    加载训练好的模型用于后续DEGs和KEGG分析
+    Load the trained model for downstream DEG and KEGG analysis.
 
     Args:
-        model_path: 模型文件路径
-        device: 设备 ('cuda' 或 'cpu')
+        model_path: path to the saved model file
+        device: device to load weights on ('cuda' or 'cpu')
 
     Returns:
-        dict: 包含模型、预测结果、基因名称等信息的字典
+        dict: dictionary containing model outputs, gene names, and metadata
     """
     print(f"Loading model from {model_path}")
 
-    # 修复PyTorch 2.6+的安全性问题
+    # Address PyTorch 2.6+ security concerns
     try:
-        # 首先尝试安全加载
+        # Attempt secure loading first
         checkpoint = torch.load(
             model_path, map_location=device, weights_only=True)
     except Exception as e:
         print(f"Safe loading failed: {e}")
         print("Trying with weights_only=False (trusted source)...")
-        # 如果安全加载失败，使用传统方式（仅用于可信来源）
+        # Fall back to the legacy loader when the source is trusted
         checkpoint = torch.load(
             model_path, map_location=device, weights_only=False)
 
-    # 提取信息
+    # Extract stored information
     model_state = checkpoint['model_state_dict']
     predictions = checkpoint['predictions']
     targets = checkpoint['targets']
 
-    # 检查是否有baselines数据，如果没有则使用targets作为baseline
+    # Use targets as baseline if the checkpoint does not include baseline data
     if 'baselines' in checkpoint:
         baselines = checkpoint['baselines']
     else:
-        print("警告: 模型文件中没有baselines数据，使用targets作为baseline")
+        print("Warning: baseline data missing in checkpoint, using targets as baseline")
         baselines = targets.copy()
 
-    # 检查其他可选数据
+    # Retrieve optional data
     perturbations = checkpoint.get('perturbations', None)
     time_embeddings = checkpoint.get('time_embeddings', None)
     gene_names = checkpoint['gene_names']
@@ -964,9 +965,9 @@ def load_model_for_analysis(model_path, device='cuda'):
     model_config = checkpoint['model_config']
     evaluation_results = checkpoint['evaluation_results']
 
-    # 跳过模型重建，直接使用保存的预测结果
-    print("跳过模型重建，直接使用保存的预测结果进行KEGG分析")
-    model = None  # 不需要模型对象
+    # Skip model reconstruction and reuse saved predictions directly
+    print("Skipping model reconstruction; using saved predictions for KEGG analysis")
+    model = None  # No model object required
 
     print(f"Model loaded successfully!")
     print(f"Gene names: {len(gene_names) if gene_names else 'None'}")
@@ -975,7 +976,7 @@ def load_model_for_analysis(model_path, device='cuda'):
     print(f"Baselines shape: {baselines.shape}")
 
     return {
-        'model': model,  # None，不需要模型对象
+        'model': model,  # None, model object not needed
         'predictions': predictions,
         'targets': targets,
         'baselines': baselines,
@@ -992,39 +993,39 @@ def load_model_for_analysis(model_path, device='cuda'):
 def create_anndata_for_analysis(predictions, targets, baselines, gene_names,
                                 perturbations=None, time_embeddings=None):
     """
-    创建AnnData对象用于下游分析（DEGs、KEGG等）
+    Create AnnData objects for downstream analysis (DEGs, KEGG, etc.).
 
     Args:
-        predictions: 预测结果 (n_samples, n_genes)
-        targets: 真实值 (n_samples, n_genes)
-        baselines: 基线表达 (n_samples, n_genes)
-        gene_names: 基因名称列表
-        perturbations: 扰动信息 (可选)
-        time_embeddings: 时间嵌入 (可选)
+        predictions: predicted expression values (n_samples, n_genes)
+        targets: observed expression values (n_samples, n_genes)
+        baselines: baseline expression (n_samples, n_genes)
+        gene_names: list of gene names
+        perturbations: perturbation information (optional)
+        time_embeddings: time embeddings (optional)
 
     Returns:
-        tuple: (pred_adata, target_adata, baseline_adata) 预测、真实值和基线的AnnData对象
+        tuple: (pred_adata, target_adata, baseline_adata) AnnData objects for predictions, observations, and baselines
     """
     import anndata as ad
 
-    # 创建预测结果的AnnData
+    # Create AnnData for predictions
     pred_adata = ad.AnnData(X=predictions)
     pred_adata.var_names = gene_names
     pred_adata.var['feature_types'] = 'Gene Expression'
 
-    # 创建真实值的AnnData
+    # Create AnnData for observations
     target_adata = ad.AnnData(X=targets)
     target_adata.var_names = gene_names
     target_adata.var['feature_types'] = 'Gene Expression'
 
-    # 创建基线的AnnData
+    # Create AnnData for baselines
     baseline_adata = ad.AnnData(X=baselines)
     baseline_adata.var_names = gene_names
     baseline_adata.var['feature_types'] = 'Gene Expression'
 
-    # 添加扰动信息（如果有）
+    # Add perturbation information if available
     if perturbations is not None:
-        # 将one-hot编码的扰动转换为扰动名称
+        # Convert one-hot perturbations into readable labels
         pert_names = []
         for pert in perturbations:
             pert_idx = np.argmax(pert)
@@ -1034,7 +1035,7 @@ def create_anndata_for_analysis(predictions, targets, baselines, gene_names,
         target_adata.obs['perturbation'] = pert_names
         baseline_adata.obs['perturbation'] = pert_names
 
-    # 添加时间信息（如果有）
+    # Add time information if available
     if time_embeddings is not None:
         pred_adata.obs['time_sin'] = time_embeddings[:, 0]
         pred_adata.obs['time_cos'] = time_embeddings[:, 1]
@@ -1048,7 +1049,7 @@ def create_anndata_for_analysis(predictions, targets, baselines, gene_names,
         baseline_adata.obs['time_cos'] = time_embeddings[:, 1]
         baseline_adata.obs['time_norm'] = time_embeddings[:, 2]
 
-    # 添加样本标识
+    # Annotate sample type
     pred_adata.obs['sample_type'] = 'predicted'
     target_adata.obs['sample_type'] = 'observed'
     baseline_adata.obs['sample_type'] = 'baseline'
@@ -1062,35 +1063,32 @@ def create_anndata_for_analysis(predictions, targets, baselines, gene_names,
 
 
 if __name__ == '__main__':
-    # 解析命令行参数
     parser = argparse.ArgumentParser(
         description='Cytokine Perturbation Model Training')
     parser.add_argument('--gpu', type=int, default=None,
-                        help='指定使用的GPU编号 (例如: --gpu 0 使用GPU 0, --gpu 1 使用GPU 1)')
+                        help='Specify GPU index (e.g., --gpu 0 uses GPU 0)')
     parser.add_argument('--list-gpus', action='store_true',
-                        help='列出所有可用的GPU并退出')
+                        help='List all available GPUs and exit')
 
     args = parser.parse_args()
 
-    # 如果只是列出GPU，则显示信息后退出
     if args.list_gpus:
         if torch.cuda.is_available():
             gpu_count = torch.cuda.device_count()
-            print(f'可用GPU数量: {gpu_count}')
+            print(f'Number of available GPUs: {gpu_count}')
             for i in range(gpu_count):
                 print(f'GPU {i}: {torch.cuda.get_device_name(i)}')
         else:
-            print('CUDA不可用')
+            print('CUDA not available')
         exit(0)
 
-    # 开始训练
     print("=" * 60)
     print("Cytokine Perturbation Model Training")
     print("=" * 60)
 
     if args.gpu is not None:
-        print(f"指定使用GPU: {args.gpu}")
+        print(f"Using specified GPU: {args.gpu}")
     else:
-        print("使用默认GPU设置")
+        print("Using default GPU settings")
 
     results_df = main(gpu_id=args.gpu)
