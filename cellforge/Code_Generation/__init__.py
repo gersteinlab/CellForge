@@ -543,7 +543,7 @@ Please generate the complete implementation based on the research plan provided.
             env_vars["TEMPERATURE"] = os.getenv("TEMPERATURE", "0.1")
             env_vars["MAX_TOKENS"] = os.getenv("MAX_TOKENS", "8000")
             
-            Add OpenHands configuration path
+            # Add OpenHands configuration path
             config_path = self.openhands_path / "config.toml"
             if config_path.exists():
                 env_vars["OPENHANDS_CONFIG_PATH"] = str(config_path)
