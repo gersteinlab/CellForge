@@ -10,6 +10,7 @@ import gzip
 import tarfile
 import zipfile
 from pathlib import Path
+from ..paths import data_path
 
 def read_h5ad(file_path):
     """read the h5ad file and return the basic information"""
@@ -41,7 +42,7 @@ def read_h5(file_path):
                 "keys": list(f.keys()),
                 "structure": {}
             }
-            
+
             def get_structure(name, obj):
                 if isinstance(obj, h5py.Dataset):
                     info["structure"][name] = {
@@ -54,7 +55,7 @@ def read_h5(file_path):
                         "type": "group",
                         "keys": list(obj.keys())
                     }
-            
+
             f.visititems(get_structure)
             return info
     except Exception as e:
@@ -92,7 +93,7 @@ def read_txt(file_path):
     """read the txt file and return the basic information"""
     try:
         with open(file_path, 'r') as f:
-            lines = f.readlines()[:10]  
+            lines = f.readlines()[:10]
             info = {
                 "type": "txt",
                 "preview": lines,
@@ -193,7 +194,7 @@ def read_compressed_file(file_path):
 def read_file(file_path):
     """based on the file extension, choose the appropriate read method"""
     ext = os.path.splitext(file_path)[1].lower()
-    
+
     if ext == '.h5ad':
         return read_h5ad(file_path)
     elif ext == '.h5':
@@ -220,75 +221,32 @@ def read_file(file_path):
 def explore_directory(directory):
     """explore all the files in the directory and return the information"""
     results = {}
-    
+
     for root, dirs, files in os.walk(directory):
         for file in files:
             file_path = os.path.join(root, file)
             rel_path = os.path.relpath(file_path, directory)
             print(f"reading: {rel_path}")
             results[rel_path] = read_file(file_path)
-    
-    return results
 
-def main():
-    
-    project_root = Path(__file__).parent.parent  
-    base_dir = project_root / "data" / "datasets" / "MimitouSmibert2021"
-    
-    print(f"start exploring the directory: {base_dir}")
-    
-    if not base_dir.exists():
-        print(f"❌ Directory not found: {base_dir}")
-        return
-    
-    results = explore_directory(str(base_dir))
-    
-    
-    output_file = project_root / "data" / "datasets" / "mimitou_data_info.json"
-    
-    try:
-        with open(output_file, 'w') as f:
-            json.dump(results, f, indent=2)
-        print(f"data information has been saved to: {output_file}")
-    except Exception as e:
-        print(f"❌ Could not save data info: {e}")
-    
-    
-    print("\nsummary information:")
-    for folder in os.listdir(base_dir):
-        folder_path = os.path.join(base_dir, folder)
-        if os.path.isdir(folder_path):
-            print(f"\ndirectory: {folder}")
-            folder_files = [f for f in results.keys() if f.startswith(folder)]
-            print(f"   number of files: {len(folder_files)}")
-            
-            
-            file_types = {}
-            for f in folder_files:
-                file_type = results[f].get("type", "unknown")
-                file_types[file_type] = file_types.get(file_type, 0) + 1
-            
-            for file_type, count in file_types.items():
-                print(f"  {file_type}: {count}")
+    return results
 
 class MultiView:
     """Multi-dataset viewing utilities for single-cell analysis"""
-    
+
     def __init__(self, datasets_dir: str = None):
         if datasets_dir is None:
-            
-            project_root = Path(__file__).parent.parent  
-            self.datasets_dir = project_root / "data" / "datasets"
+            self.datasets_dir = data_path("datasets")
         else:
             self.datasets_dir = Path(datasets_dir)
         self.datasets = {}
-    
+
     def load_all_datasets(self):
         """Load all datasets in the directory"""
         if not self.datasets_dir.exists():
             print(f"❌ Directory not found: {self.datasets_dir}")
             return
-        
+
         for file_path in self.datasets_dir.rglob("*"):
             if file_path.is_file() and file_path.suffix in ['.h5ad', '.h5', '.csv', '.tsv']:
                 try:
@@ -297,41 +255,38 @@ class MultiView:
                     print(f"✅ Loaded: {file_path.name}")
                 except Exception as e:
                     print(f"❌ Failed to load {file_path.name}: {e}")
-    
+
     def show_dataset_summary(self):
         """Show summary of all loaded datasets"""
         print("=" * 60)
         print("DATASET SUMMARY")
         print("=" * 60)
-        
+
         for path, info in self.datasets.items():
             print(f"\n📁 {Path(path).name}")
             print(f"   Path: {path}")
             print(f"   Type: {info.get('type', 'Unknown')}")
-            
+
             if 'shape' in info:
                 print(f"   Shape: {info['shape']}")
-            
+
             if 'error' in info:
                 print(f"   ❌ Error: {info['error']}")
-        
+
         print("=" * 60)
-    
+
     def compare_datasets(self):
         """Compare multiple datasets"""
         if len(self.datasets) < 2:
             print("⚠️  Need at least 2 datasets to compare")
             return
-        
+
         print("=" * 60)
         print("DATASET COMPARISON")
         print("=" * 60)
-        
+
         for path, info in self.datasets.items():
             if 'shape' in info:
                 print(f"{Path(path).name}: {info['shape']}")
-        
-        print("=" * 60)
 
-if __name__ == "__main__":
-    main() 
+        print("=" * 60)

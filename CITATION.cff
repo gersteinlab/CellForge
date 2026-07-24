@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+title: "CellForge: Open-Ended Autonomous Design of Computational Methods for Single-Cell Omics via Multi-Agent Collaboration"
+message: "If you use CellForge, please cite the accompanying manuscript."
+type: software
+license: MIT
+repository-code: "https://github.com/GabbyKoki/cellforge-new"
+version: 0.1.0
+date-released: 2026-07-19
+authors:
+  - name: "CellForge authors"

@@ -2,54 +2,17 @@ from typing import List, Dict, Any
 from dataclasses import dataclass
 from enum import Enum
 import numpy as np
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch_geometric.nn import GCNConv, GATConv
-from torch_geometric.data import Data
-import scanpy as sc
-import anndata
-import pandas as pd
-import scipy
-from scipy import stats
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
-from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
-import networkx as nx
-import matplotlib.pyplot as plt
-import seaborn as sns
-from rdkit import Chem
-from rdkit.Chem import AllChem
-import gseapy
-from gseapy import enrichr
-import mygene
-import requests
-import json
-from tqdm import tqdm
 import logging
 import warnings
-import os
-from pathlib import Path
+from ..llm import LLMInterface
 warnings.filterwarnings('ignore')
-
-# Load environment variables from .env file
-try:
-    from dotenv import load_dotenv
-    # 明确指定.env文件路径
-    env_path = Path(__file__).parent.parent.parent / ".env"
-    load_dotenv(env_path)
-    print(f"Loaded .env from: {env_path}")
-except ImportError:
-    print("Warning: python-dotenv not installed, using system environment variables")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class ExpertDomain(Enum):
     DATA_ENGINEERING = "data_engineering"
-    SINGLE_CELL_BIOLOGY = "single_cell_biology" 
+    SINGLE_CELL_BIOLOGY = "single_cell_biology"
     DEEP_LEARNING = "deep_learning"
     MOLECULAR_BIOLOGY = "molecular_biology"
     BIOINFORMATICS = "bioinformatics"
@@ -77,7 +40,7 @@ class Expert:
     background: str = ""
     specializations: List[str] = None
     tools: Dict[str, List[str]] = None
-    
+
     def __post_init__(self):
         if self.knowledge_base is None:
             self.knowledge_base = {}
@@ -93,7 +56,7 @@ class Expert:
 class ExpertPool:
     def __init__(self):
         self.experts = self._initialize_experts()
-        
+
     def _initialize_experts(self) -> List[Expert]:
         return [
             Expert(
@@ -2506,44 +2469,44 @@ class ExpertPool:
                 }
             )
         ]
-    
+
     def select_experts_for_task(self, task_type: str, task_analysis: Dict[str, Any]) -> List[Expert]:
         """Select experts using LLM reasoning based on task requirements"""
-        
+
         # Use LLM to select appropriate experts
         selected_experts = self._select_experts_with_llm(task_type, task_analysis)
-        
+
         if not selected_experts:
             # Fallback to core experts if LLM selection fails
             selected_experts = self._get_core_experts(task_type)
-        
+
         return selected_experts
-    
+
     def _select_experts_with_llm(self, task_type: str, task_analysis: Dict[str, Any]) -> List[Expert]:
         """Use LLM to intelligently select experts for the task"""
         try:
             # Create expert profiles for LLM
             expert_profiles = self._create_expert_profiles()
-            
+
             # Create LLM prompt for expert selection
             prompt = self._create_expert_selection_prompt(task_type, task_analysis, expert_profiles)
-            
+
             # Get LLM response (simplified for now)
             selected_expert_names = self._get_llm_expert_selection(prompt)
-            
+
             # Convert names to expert objects
             selected_experts = []
             for name in selected_expert_names:
                 expert = self._get_expert_by_name(name)
                 if expert:
                     selected_experts.append(expert)
-            
+
             return selected_experts
-            
+
         except Exception as e:
             print(f"LLM expert selection failed: {e}")
             return []
-    
+
     def _create_expert_profiles(self) -> str:
         """Create expert profiles for LLM consideration"""
         profiles = []
@@ -2557,13 +2520,13 @@ Skills: {', '.join(expert.skills)}
 Specializations: {', '.join(expert.specializations)}
 """
             profiles.append(profile)
-        
+
         return "\n".join(profiles)
-    
+
     def _create_expert_selection_prompt(self, task_type: str, task_analysis: Dict[str, Any], expert_profiles: str) -> str:
         """Create prompt for LLM expert selection"""
         task_summary = str(task_analysis)[:1000]  # Limit length
-        
+
         prompt = f"""
 You are an expert coordinator for a scientific research team. Based on the task requirements, select the most appropriate experts to collaborate on this project.
 
@@ -2587,24 +2550,19 @@ Requirements:
 Please respond with only the names of the selected experts, one per line:
 """
         return prompt
-    
+
     def _get_llm_expert_selection(self, prompt: str) -> List[str]:
         """Get expert selection from LLM"""
         try:
-            # Import LLM client
-            try:
-                from ..llm import LLMInterface
-            except ImportError:
-                from llm import LLMInterface
             llm_client = LLMInterface()
-            
+
             # Call LLM for expert selection
             response = llm_client.chat_completion(
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
                 max_tokens=500
             )
-            
+
             # Parse response to extract expert names
             expert_names = []
             lines = response.strip().split('\n')
@@ -2612,7 +2570,7 @@ Please respond with only the names of the selected experts, one per line:
                 line = line.strip()
                 if line and not line.startswith('#'):
                     expert_names.append(line)
-            
+
             # Validate expert names exist
             valid_experts = []
             for name in expert_names:
@@ -2621,27 +2579,27 @@ Please respond with only the names of the selected experts, one per line:
                     valid_experts.append(name)
                 except ValueError:
                     print(f"Warning: Expert '{name}' not found, skipping")
-            
+
             return valid_experts if valid_experts else self._get_fallback_experts()
-            
+
         except Exception as e:
             print(f"LLM expert selection failed: {e}")
             return self._get_fallback_experts()
-    
+
     def _get_fallback_experts(self) -> List[str]:
         """Fallback expert selection - includes core required experts"""
         return [
             "Data Engineer",
-            "Single Cell Biology Expert", 
+            "Single Cell Biology Expert",
             "Deep Learning Expert",
             "Training Expert",
             "Critic Agent"
         ]
-    
+
     def _get_core_experts(self, task_type: str) -> List[Expert]:
         """Fallback method to get core experts"""
         core_experts = []
-        
+
         # Always include these core experts
         core_domains = [
             ExpertDomain.DATA_ENGINEERING,
@@ -2649,21 +2607,21 @@ Please respond with only the names of the selected experts, one per line:
             ExpertDomain.DEEP_LEARNING,
             ExpertDomain.TRAINING
         ]
-        
+
         for domain in core_domains:
             domain_experts = [e for e in self.experts if e.domain == domain]
             if domain_experts:
                 # Select the expert with highest expertise level
                 best_expert = max(domain_experts, key=lambda e: e.expertise_level)
                 core_experts.append(best_expert)
-        
+
         return core_experts
-    
+
     def _get_expert_by_name(self, name: str) -> Expert:
         for expert in self.experts:
             if expert.name == name:
                 return expert
         raise ValueError(f"Expert not found: {name}")
-    
+
     def update_expert_confidence(self, expert: Expert, new_confidence: float):
         expert.confidence = np.clip(new_confidence, 0.0, 1.0)

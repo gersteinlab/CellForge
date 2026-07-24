@@ -1,60 +1,52 @@
 from typing import Dict, Any, List
 from datetime import datetime
-try:
-    from .data_structures import AnalysisResult
-    from .rag import RAGSystem
-    from .knowledge_base import knowledge_base
-    from ..llm import LLMInterface
-except ImportError:
-    from data_structures import AnalysisResult
-    from rag import RAGSystem
-    from knowledge_base import knowledge_base
-    from cellforge.llm import LLMInterface
 import json
-import os
-from pathlib import Path
+from ..paths import data_path
+from .data_structures import AnalysisResult
+from .knowledge_base import knowledge_base
+from ..llm import LLMInterface
 
 class BaselineAssessor:
     """Expert agent for assessing baseline models and evaluation strategies in single cell perturbation prediction"""
-    
-    def __init__(self, rag_system: RAGSystem):
+
+    def __init__(self, rag_system):
         self.rag_system = rag_system
         self.llm = LLMInterface()
-        
+
     def assess_baselines(self, task_description: str, dataset_info: Dict[str, Any],
                         retrieved_papers: List[Dict[str, Any]]) -> AnalysisResult:
         """
         Assess baseline models and evaluation strategies using knowledge base
-        
+
         Args:
             task_description: Description of the research task
             dataset_info: Dictionary containing dataset metadata
             retrieved_papers: List of relevant papers from vector database
-            
+
         Returns:
             AnalysisResult with baseline assessment
         """
         # 使用knowledge base而不是重复搜索
         knowledge_items = knowledge_base.search_both_databases(
-            knowledge_type="papers", 
+            knowledge_type="papers",
             query=task_description,
             limit=10
         )
-        
+
         # 获取评估框架信息
         evaluation_items = knowledge_base.search_both_databases(
             knowledge_type="evaluation_frameworks",
             query=task_description,
             limit=5
         )
-        
+
         # 获取实现指南信息
         implementation_items = knowledge_base.search_both_databases(
             knowledge_type="implementation_guides",
             query=task_description,
             limit=5
         )
-        
+
         # 合并所有论文信息
         all_papers = retrieved_papers + [
             {
@@ -65,21 +57,21 @@ class BaselineAssessor:
             }
             for item in knowledge_items
         ]
-        
+
         # 合并评估框架信息
         evaluation_frameworks = [item.content for item in evaluation_items]
-        
+
         # 合并实现指南信息
         implementation_guides = [item.content for item in implementation_items]
-        
+
         # Format prompt with task information and retrieved papers
         prompt = self._format_prompt_with_evaluation_frameworks(
             task_description, dataset_info, all_papers, evaluation_frameworks, implementation_guides
         )
-        
+
         # Run assessment (implementation depends on your LLM backend)
         assessment_content = self._run_llm(prompt)
-        
+
         return AnalysisResult(
             content=assessment_content,
             confidence_score=1.0,  # 临时设置，后续会由其他模块计算
@@ -94,7 +86,7 @@ class BaselineAssessor:
                 }
             }
         )
-    
+
     def _extract_method_info(self, papers: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         Automatically extract method information (e.g., scGPT, Random Forest, etc.) from retrieved papers and analyze their principle, strengths, and limitations.
@@ -113,7 +105,7 @@ class BaselineAssessor:
                 "keywords": ["linear regression"],
                 "principle": "Linear model for regression tasks.",
             },
-            
+
         }
         for paper in papers:
             title = paper.get("title", "").lower()
@@ -133,7 +125,7 @@ class BaselineAssessor:
         """
         Simple analysis of method limitations (can be enhanced with LLM in the future)
         """
-        
+
         if method == "scgpt":
             if "interpret" in abstract or "black box" in abstract:
                 return "Potential limitation in biological interpretability."
@@ -145,17 +137,17 @@ class BaselineAssessor:
         return "See paper for details."
 
     def _format_prompt_with_evaluation_frameworks(self, task_description: str, dataset_info: Dict[str, Any],
-                                                retrieved_papers: List[Dict[str, Any]], 
+                                                retrieved_papers: List[Dict[str, Any]],
                                                 evaluation_frameworks: List[Dict[str, Any]],
                                                 implementation_guides: List[Dict[str, Any]]) -> str:
         """Format prompt with evaluation frameworks and implementation guides"""
-        
+
         # Format paper context
         papers_context = "\n".join([
             f"- {paper.get('title', 'No title')}: {paper.get('abstract', paper.get('content', paper.get('snippet', 'No content')))[:200]}..."
             for paper in retrieved_papers[:5]
         ])
-        
+
         # Format evaluation framework information
         framework_context = ""
         if evaluation_frameworks:
@@ -163,7 +155,7 @@ class BaselineAssessor:
 EVALUATION FRAMEWORKS:
 {chr(10).join([f"- {framework.get('title', 'No title')}: {framework.get('content', 'No content')[:200]}..." for framework in evaluation_frameworks[:3]])}
 """
-        
+
         # Format implementation guide information
         guide_context = ""
         if implementation_guides:
@@ -171,7 +163,7 @@ EVALUATION FRAMEWORKS:
 IMPLEMENTATION GUIDES:
 {chr(10).join([f"- {guide.get('title', 'No title')}: {guide.get('content', 'No content')[:200]}..." for guide in implementation_guides[:3]])}
 """
-        
+
         # Extract method information
         method_infos = self._extract_method_info(retrieved_papers)
         if method_infos:
@@ -314,14 +306,14 @@ Please provide a comprehensive assessment in the following JSON format:
 }}"""
 
     def _format_prompt_with_decision_support(self, task_description: str, dataset_info: Dict[str, Any],
-                                           retrieved_papers: List[Dict[str, Any]], 
+                                           retrieved_papers: List[Dict[str, Any]],
                                            code_implementations: List[Dict[str, Any]],
                                            decision_support: Dict[str, Any],
                                            experimental_designs: List[Dict[str, Any]],
                                            evaluation_frameworks: List[Dict[str, Any]],
                                            implementation_guides: List[Dict[str, Any]]) -> str:
         """Format prompt with decision support information"""
-        
+
         # Format paper context, including decision support information
         papers_context = "\n".join([
             f"- {paper.get('title', 'No title')}: {paper.get('abstract', paper.get('content', paper.get('snippet', 'No content')))[:200]}...\n"
@@ -331,7 +323,7 @@ Please provide a comprehensive assessment in the following JSON format:
             f"  Decision Support: {json.dumps(paper.get('decision_support', {}), indent=2)}"
             for paper in retrieved_papers[:5]
         ])
-        
+
         # Format code context
         code_context = "\n".join([
             f"- {code['title']}: {code['content'][:200]}...\n"
@@ -339,7 +331,7 @@ Please provide a comprehensive assessment in the following JSON format:
             f"  Framework: {', '.join(code.get('metadata', {}).get('framework', []))}"
             for code in code_implementations[:3]
         ])
-        
+
         # Format decision support information
         decision_context = ""
         if decision_support:
@@ -351,7 +343,7 @@ Data Preparation: {json.dumps(decision_support.get('data_preparation', {}), inde
 Implementation Plan: {json.dumps(decision_support.get('implementation_plan', {}), indent=2)}
 Risk Assessment: {json.dumps(decision_support.get('risk_assessment', {}), indent=2)}
 """
-        
+
         # Format experimental design information
         design_context = ""
         if experimental_designs:
@@ -359,7 +351,7 @@ Risk Assessment: {json.dumps(decision_support.get('risk_assessment', {}), indent
 EXPERIMENTAL DESIGNS:
 {chr(10).join([f"- {design['title']}: {design['content'][:200]}..." for design in experimental_designs[:3]])}
 """
-        
+
         # Format evaluation framework information
         framework_context = ""
         if evaluation_frameworks:
@@ -367,7 +359,7 @@ EXPERIMENTAL DESIGNS:
 EVALUATION FRAMEWORKS:
 {chr(10).join([f"- {framework['title']}: {framework['content'][:200]}..." for framework in evaluation_frameworks[:3]])}
 """
-        
+
         # Format implementation guide information
         guide_context = ""
         if implementation_guides:
@@ -375,7 +367,7 @@ EVALUATION FRAMEWORKS:
 IMPLEMENTATION GUIDES:
 {chr(10).join([f"- {guide['title']}: {guide['content'][:200]}..." for guide in implementation_guides[:3]])}
 """
-        
+
         # Extract method information
         method_infos = self._extract_method_info(retrieved_papers)
         if method_infos:
@@ -546,10 +538,10 @@ Please provide a comprehensive assessment in the following JSON format, incorpor
         Generate a comprehensive analysis report in JSON format, similar to drug-5.md and gene-RNA-2-A.md.
         The report includes dataset characteristics, task requirements, baseline models analysis, and improvement suggestions.
         """
-        
+
         method_infos = self._extract_method_info(retrieved_papers)
-        
-        
+
+
         dataset_section = {
             "source_protocol": dataset_info.get('source', 'N/A'),
             "composition": {
@@ -574,8 +566,8 @@ Please provide a comprehensive assessment in the following JSON format, incorpor
                 "metadata": dataset_info.get('metadata', 'N/A')
             }
         }
-        
-        
+
+
         task_section = {
             "core_task_definition": task_description,
             "mathematical_formulation": {
@@ -616,8 +608,8 @@ Please provide a comprehensive assessment in the following JSON format, incorpor
                 ]
             }
         }
-        
-        
+
+
         baseline_section = {
             "literature_based_model_candidates": [
                 {
@@ -629,8 +621,8 @@ Please provide a comprehensive assessment in the following JSON format, incorpor
                 for method in method_infos
             ]
         }
-        
-        
+
+
         improvement_section = {
             "recommendations": [
                 {
@@ -665,20 +657,19 @@ Please provide a comprehensive assessment in the following JSON format, incorpor
                 }
             ]
         }
-        
-        
+
+
         report = {
             "dataset_characteristics": dataset_section,
             "task_requirements": task_section,
             "baseline_models_analysis": baseline_section,
             "improvement_suggestions": improvement_section
         }
-        
-        
-        # 使用现有的目录结构
-        project_root = Path(__file__).parent.parent  # cellforge目录
-        results_dir = project_root / "data" / "results"
-        
+
+
+        results_dir = data_path("analyses", "unknown_dataset")
+        results_dir.mkdir(parents=True, exist_ok=True)
+
         try:
             report_path = results_dir / "analysis_report.json"
             with open(report_path, "w", encoding="utf-8") as f:
@@ -693,28 +684,28 @@ Please provide a comprehensive assessment in the following JSON format, incorpor
         """Run LLM with retry mechanism for network errors"""
         max_retries = 3
         retry_delay = 5  # seconds
-        
+
         for attempt in range(max_retries):
             try:
                 print(f"🔄 LLM attempt {attempt + 1}/{max_retries}")
-                
+
                 system_prompt = "You are an expert in single-cell model evaluation. Provide your response in valid JSON format."
                 response = self.llm.generate(prompt, system_prompt)
-                
+                content = response.get("content") or ""
+
                 # Parse the response content as JSON
                 try:
-                    return json.loads(response["content"])
+                    return json.loads(content)
                 except json.JSONDecodeError:
                     # If direct parsing fails, try to extract JSON from markdown code blocks
                     import re
-                    content = response["content"]
                     json_match = re.search(r'```json\n(.*?)\n```', content, re.DOTALL)
                     if json_match:
                         return json.loads(json_match.group(1))
                     else:
                         # Return the raw content if JSON parsing fails
                         return {"content": content, "error": "Failed to parse JSON response"}
-                        
+
             except Exception as e:
                 error_msg = str(e)
                 if "Connection broken" in error_msg or "InvalidChunkLength" in error_msg:
@@ -748,6 +739,6 @@ Please provide a comprehensive assessment in the following JSON format, incorpor
                 else:
                     # 其他错误直接抛出
                     raise Exception(f"LLM generation failed: {error_msg}")
-        
+
         # 如果所有重试都失败
-        return {"content": "LLM generation failed after all retries", "error": "Connection issues"} 
+        return {"content": "LLM generation failed after all retries", "error": "Connection issues"}

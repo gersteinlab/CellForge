@@ -10,7 +10,7 @@ class AnalysisResult:
     confidence_score: float
     timestamp: datetime
     metadata: Dict[str, Any]
-    
+
     def to_dict(self) -> Dict:
         """Convert to dictionary format"""
         return {
@@ -19,7 +19,7 @@ class AnalysisResult:
             "timestamp": self.timestamp.isoformat(),
             "metadata": self.metadata
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict) -> 'AnalysisResult':
         """Create from dictionary format"""
@@ -39,7 +39,7 @@ class TaskAnalysisReport:
     refinement_comments: List[Dict[str, Any]]
     final_recommendations: Dict[str, Any]
     timestamp: datetime
-    
+
     def to_dict(self) -> Dict:
         """Convert to dictionary format"""
         return {
@@ -50,7 +50,7 @@ class TaskAnalysisReport:
             "final_recommendations": self.final_recommendations,
             "timestamp": self.timestamp.isoformat()
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict) -> 'TaskAnalysisReport':
         """Create from dictionary format"""
@@ -62,13 +62,13 @@ class TaskAnalysisReport:
             final_recommendations=data["final_recommendations"],
             timestamp=datetime.fromisoformat(data["timestamp"])
         )
-    
+
     def to_markdown(self) -> str:
         """Convert to markdown format with enhanced structure and formatting"""
         sections = [
             "# Task Analysis Report",
             f"Generated on: {self.timestamp.strftime('%Y-%m-%d %H:%M:%S')}\n",
-            
+
             "## 1. Dataset Analysis",
             "### Experimental Design & Scale",
             self._format_section(self.dataset_analysis.content.get("experimental_design", {})),
@@ -78,7 +78,7 @@ class TaskAnalysisReport:
             self._format_section(self.dataset_analysis.content.get("preprocessing", {})),
             "\n### Quality Assessment",
             self._format_section(self.dataset_analysis.content.get("quality_assessment", {})),
-            
+
             "\n## 2. Problem Investigation",
             "### Formal Definition",
             self._format_section(self.problem_investigation.content.get("formal_definition", {})),
@@ -88,7 +88,7 @@ class TaskAnalysisReport:
             self._format_section(self.problem_investigation.content.get("research_questions", {})),
             "\n### Analysis Methods",
             self._format_section(self.problem_investigation.content.get("analysis_methods", {})),
-            
+
             "\n## 3. Baseline Assessment",
             "### Baseline Models Analysis",
             self._format_section(self.baseline_assessment.content.get("baseline_models", {})),
@@ -98,11 +98,11 @@ class TaskAnalysisReport:
             self._format_section(self.baseline_assessment.content.get("performance_analysis", {})),
             "\n### Improvement Suggestions",
             self._format_section(self.baseline_assessment.content.get("improvement_suggestions", {})),
-            
+
             "\n## 4. Refinement Process",
-            *[f"\n### Round {i+1}\n" + self._format_refinement_round(comment) 
+            *[f"\n### Round {i+1}\n" + self._format_refinement_round(comment)
               for i, comment in enumerate(self.refinement_comments)],
-            
+
             "\n## 5. Final Recommendations",
             "### Data Processing Pipeline",
             self._format_section(self.final_recommendations.get("data_processing", {})),
@@ -116,12 +116,12 @@ class TaskAnalysisReport:
             self._format_section(self.final_recommendations.get("implementation_roadmap", {}))
         ]
         return "\n".join(sections)
-    
+
     def _format_section(self, content: Dict[str, Any]) -> str:
         """Format a section with proper markdown structure"""
         if not content:
             return ""
-            
+
         formatted_lines = []
         for key, value in content.items():
             if isinstance(value, list):
@@ -139,9 +139,9 @@ class TaskAnalysisReport:
                         formatted_lines.append(f"\n**{subkey.title()}**: {subvalue}")
             else:
                 formatted_lines.append(f"\n**{key.title()}**: {value}")
-        
+
         return "\n".join(formatted_lines)
-    
+
     def _format_refinement_round(self, comment: Dict[str, Any]) -> str:
         """Format a refinement round with proper structure"""
         sections = []
@@ -155,8 +155,8 @@ class TaskAnalysisReport:
                 else:
                     sections.append(f"- {items}")
         return "\n".join(sections)
-    
+
     def save_report(self, filepath: str):
         """Save report to markdown file"""
         with open(filepath, "w", encoding="utf-8") as f:
-            f.write(self.to_markdown()) 
+            f.write(self.to_markdown())

@@ -1,27 +1,32 @@
-from .data_structures import AnalysisResult, TaskAnalysisReport
-from .dataset_analyst import DatasetAnalyst
-from .problem_investigator import ProblemInvestigator
-from .baseline_assessor import BaselineAssessor
-from .refinement_agent import RefinementAgent
-from .collaboration import CollaborationSystem, Agent
-from .rag import RAGSystem
-from .search import SearchResult
-from .dataparser import DataParser
-from .view import View
-from .view_multi import MultiView
+"""Task Analysis public API with lazy imports.
 
-__all__ = [
-    'AnalysisResult',
-    'TaskAnalysisReport',
-    'DatasetAnalyst',
-    'ProblemInvestigator',
-    'BaselineAssessor',
-    'RefinementAgent',
-    'CollaborationSystem',
-    'Agent',
-    'RAGSystem',
-    'SearchResult',
-    'DataParser',
-    'View',
-    'MultiView'
-] 
+Importing the package should not initialize Scanpy, sentence transformers, or
+network clients. Heavy components are loaded only when requested.
+"""
+
+from importlib import import_module
+
+
+_EXPORTS = {
+    "AnalysisResult": (".data_structures", "AnalysisResult"),
+    "TaskAnalysisReport": (".data_structures", "TaskAnalysisReport"),
+    "DatasetAnalyst": (".dataset_analyst", "DatasetAnalyst"),
+    "ProblemInvestigator": (".problem_investigator", "ProblemInvestigator"),
+    "BaselineAssessor": (".baseline_assessor", "BaselineAssessor"),
+    "RefinementAgent": (".refinement_agent", "RefinementAgent"),
+    "CollaborationSystem": (".collaboration", "CollaborationSystem"),
+    "Agent": (".collaboration", "Agent"),
+    "View": (".view", "View"),
+    "MultiView": (".view_multi", "MultiView"),
+}
+
+__all__ = list(_EXPORTS)
+
+
+def __getattr__(name):
+    if name not in _EXPORTS:
+        raise AttributeError(name)
+    module_name, attribute = _EXPORTS[name]
+    value = getattr(import_module(module_name, __name__), attribute)
+    globals()[name] = value
+    return value

@@ -124,9 +124,6 @@ pandocfilters>=1.5.0
 pygments>=2.15.1
 tinycss2>=1.2.1
 
-# Docker for OpenHands integration
-docker>=6.0.0
-
 # Additional utilities
 wget>=3.2
 sympy>=1.11.1
@@ -136,10 +133,6 @@ pillow>=9.3.0
 openai>=1.0.0
 anthropic>=0.7.0
 
-# OpenHands Dependencies
-litellm>=1.0.0
-toml>=0.10.2
-
 # Search & RAG
 PyGithub>=1.59.0
 google-search-results>=2.4.2
@@ -148,5 +141,3 @@ google-search-results>=2.4.2
 torch-geometric>=2.3.0
 # rdkit-pypi>=2022.9.1
 mygene>=3.2.2
-
-

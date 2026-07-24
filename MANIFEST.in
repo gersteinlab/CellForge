@@ -1,25 +1,24 @@
 include README.md
 include LICENSE
+include CITATION.cff
 include requirements.txt
 include setup.py
-include install.bat
-
-
-recursive-include config *.yaml
-recursive-include config *.json
-
-
-recursive-include data/datasets/.gitkeep
-recursive-include data/pdfs/.gitkeep
-recursive-include data/cache/pdf/.gitkeep
-
-
-recursive-include research_plans *.json
-
-recursive-include tests *
+include config.json
+include .env.example
+recursive-include figs *.png
+recursive-include cellforge *.md
+recursive-include cellforge *.mjs
+recursive-include scripts *.py
+recursive-include tests *.py
 
 
 recursive-exclude * __pycache__
 recursive-exclude * *.py[cod]
 recursive-exclude * .DS_Store
-recursive-exclude * *.log 
+recursive-exclude * *.log
+recursive-exclude data *
+recursive-exclude results *
+recursive-exclude outputs *
+recursive-exclude logs *
+recursive-exclude node_modules *
+recursive-exclude knowledge_base *

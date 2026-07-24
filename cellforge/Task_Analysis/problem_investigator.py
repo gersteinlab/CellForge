@@ -1,57 +1,46 @@
 from typing import Dict, Any, List
 from datetime import datetime
-import os
 import json
 
-try:
-    from .data_structures import AnalysisResult
-    from .rag import RAGSystem
-    from .knowledge_base import knowledge_base
-    from ..llm import LLMInterface
-except ImportError:
-    import sys
-    import os
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from data_structures import AnalysisResult
-    from rag import RAGSystem
-    from knowledge_base import knowledge_base
-    from cellforge.llm import LLMInterface
+from .data_structures import AnalysisResult
+from .knowledge_base import knowledge_base
+from ..llm import LLMInterface
 
 class ProblemInvestigator:
     """Expert agent for investigating research problems and defining analytical approaches"""
-    
-    def __init__(self, rag_system: RAGSystem):
+
+    def __init__(self, rag_system):
         self.rag_system = rag_system
-        
+
         self.llm = LLMInterface()
-    
+
     def _run_llm(self, prompt: str) -> Dict[str, Any]:
         """Run LLM with retry mechanism for network errors"""
         max_retries = 3
         retry_delay = 5  # seconds
-        
+
         for attempt in range(max_retries):
             try:
                 print(f"🔄 LLM attempt {attempt + 1}/{max_retries}")
-                
+
                 system_prompt = "You are an expert in single-cell perturbation research. Provide your response in valid JSON format."
-                
+
                 response = self.llm.generate(prompt, system_prompt)
-                
+                content = response.get("content") or ""
+
                 # Parse the response content as JSON
                 try:
-                    return json.loads(response["content"])
+                    return json.loads(content)
                 except json.JSONDecodeError:
                     # If direct parsing fails, try to extract JSON from markdown code blocks
                     import re
-                    content = response["content"]
                     json_match = re.search(r'```json\n(.*?)\n```', content, re.DOTALL)
                     if json_match:
                         return json.loads(json_match.group(1))
                     else:
                         # Return the raw content if JSON parsing fails
                         return {"content": content, "error": "Failed to parse JSON response"}
-                        
+
             except Exception as e:
                 error_msg = str(e)
                 if "Connection broken" in error_msg or "InvalidChunkLength" in error_msg:
@@ -79,44 +68,44 @@ class ProblemInvestigator:
                 else:
                     # 其他错误直接抛出
                     raise Exception(f"LLM generation failed: {error_msg}")
-        
+
         # 如果所有重试都失败
         return {"content": "LLM generation failed after all retries", "error": "Connection issues"}
-    
+
     def investigate_problem(self, task_description: str, dataset_info: Dict[str, Any],
                            retrieved_papers: List[Dict[str, Any]]) -> AnalysisResult:
         """
         Investigate research problem and define analytical approaches using knowledge base
-        
+
         Args:
             task_description: Description of the research task
             dataset_info: Dictionary containing dataset metadata
             retrieved_papers: List of relevant papers from vector database
-            
+
         Returns:
             AnalysisResult with problem investigation
         """
         # 使用knowledge base而不是重复搜索
         knowledge_items = knowledge_base.search_both_databases(
-            knowledge_type="papers", 
+            knowledge_type="papers",
             query=task_description,
             limit=10
         )
-        
+
         # 获取实现指南信息
         implementation_items = knowledge_base.search_both_databases(
             knowledge_type="implementation_guides",
             query=task_description,
             limit=5
         )
-        
+
         # 获取评估框架信息
         evaluation_items = knowledge_base.search_both_databases(
             knowledge_type="evaluation_frameworks",
             query=task_description,
             limit=5
         )
-        
+
         # 合并所有论文信息
         all_papers = retrieved_papers + [
             {
@@ -127,21 +116,21 @@ class ProblemInvestigator:
             }
             for item in knowledge_items
         ]
-        
+
         # 合并实现指南信息
         implementation_guides = [item.content for item in implementation_items]
-        
+
         # 合并评估框架信息
         evaluation_frameworks = [item.content for item in evaluation_items]
-        
+
         # Format prompt with task information and retrieved papers
         prompt = self._format_prompt_with_implementation_guides(
             task_description, dataset_info, all_papers, implementation_guides, evaluation_frameworks
         )
-        
+
         # Run investigation (implementation depends on your LLM backend)
         investigation_content = self._run_llm(prompt)
-        
+
         return AnalysisResult(
             content=investigation_content,
             confidence_score=1.0,  # 临时设置，后续会由其他模块计算
@@ -156,7 +145,7 @@ class ProblemInvestigator:
                 }
             }
         )
-    
+
     def _format_prompt(self, task_description: str, dataset_info: Dict[str, Any],
                       retrieved_papers: List[Dict[str, Any]]) -> str:
         """Format prompt for problem investigation"""
@@ -164,7 +153,7 @@ class ProblemInvestigator:
             f"- {paper.get('title', 'No title')}: {paper.get('abstract', paper.get('content', paper.get('snippet', 'No content')))[:200]}..."
             for paper in retrieved_papers[:5]
         ])
-        
+
         return f"""You are an expert in biological research problem analysis with extensive experience in designing computational solutions for biological applications. Your task is to provide a comprehensive investigation of the research problem and design a solution approach, focusing on problem definition, key challenges, research questions, and analysis methods.
 
 1. Define Research Problem:
@@ -343,7 +332,7 @@ Please provide a comprehensive investigation in the following JSON format:
             f"- {paper.get('title', 'No title')}: {paper.get('abstract', paper.get('content', paper.get('snippet', 'No content')))[:200]}..."
             for paper in papers[:5]
         ])
-        
+
         return f"""You are an expert in biological research problem analysis with extensive experience in designing computational solutions for biological applications. Your task is to provide a comprehensive investigation of the research problem and design a solution approach, focusing on problem definition, key challenges, research questions, and analysis methods.
 
 1. Define Research Problem:
@@ -518,4 +507,4 @@ Please provide a comprehensive investigation in the following JSON format:
             "biological_validation": "string"
         }}
     }}
-}}""" 
+}}"""

@@ -6,16 +6,6 @@ from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 import json
 import os
-from pathlib import Path
-
-# Load environment variables from .env file
-try:
-    from dotenv import load_dotenv
-    env_path = Path(__file__).parent.parent.parent / ".env"
-    load_dotenv(env_path)
-    print(f"Loaded .env from: {env_path}")
-except ImportError:
-    print("Warning: python-dotenv not installed, using system environment variables")
 
 @dataclass
 class DiscussionMessage:
@@ -33,13 +23,17 @@ class ExpertDiscussion:
         self.discussion_history = []
         self.current_round = 0
         self.knowledge_cache = {}
+        self.fast_mode = os.getenv("METHOD_DESIGN_FAST_MODE", "true").lower() in {"1", "true", "yes"}
+        self.max_tokens_per_call = int(os.getenv("METHOD_DESIGN_MAX_TOKENS_PER_CALL", "350"))
+        self.token_budget = int(os.getenv("METHOD_DESIGN_TOKEN_BUDGET", "120000"))
+        self.token_stats = {"calls": 0, "prompt_tokens_est": 0, "completion_tokens_est": 0}
 
         if not hasattr(ExpertDiscussion, '_llm_validated'):
             self._validate_llm_config()
             ExpertDiscussion._llm_validated = True
-        
-    def generate_expert_prompt(self, expert_name: str, expert_domain: str, 
-                             task_analysis: Dict[str, Any], 
+
+    def generate_expert_prompt(self, expert_name: str, expert_domain: str,
+                             task_analysis: Dict[str, Any],
                              message_type: str,
                              context: List[DiscussionMessage] = None) -> str:
         """Generate context-aware prompt for expert discussion"""
@@ -97,7 +91,7 @@ Your role is to contribute your expertise in {expert_domain} to ensure these goa
 
         if knowledge_content:
             base_prompt += f"\n\nRELEVANT KNOWLEDGE:\n{knowledge_content}"
-            
+
         # Add context from previous messages if available
         if context:
             context_str = "\nPrevious Discussion:\n"
@@ -107,7 +101,7 @@ Your role is to contribute your expertise in {expert_domain} to ensure these goa
 
         domain_context = self._get_domain_context(expert_domain)
         base_prompt += f"\n\nDOMAIN CONTEXT:\n{domain_context}"
-        
+
         if message_type == 'proposal':
             base_prompt += """
 Please propose a detailed architectural solution focusing on your domain expertise. Your proposal should aim to surpass current SOTA models in single-cell perturbation prediction.
@@ -277,7 +271,7 @@ Focus on potential for surpassing SOTA performance in single-cell perturbation p
                               message_type: str,
                               context: List[DiscussionMessage] = None) -> DiscussionMessage:
         """Generate a message from an expert using LLM"""
-        
+
         # Generate appropriate prompt
         prompt = self.generate_expert_prompt(
             expert_name=expert_name,
@@ -286,15 +280,31 @@ Focus on potential for surpassing SOTA performance in single-cell perturbation p
             message_type=message_type,
             context=context
         )
-        
+
         try:
             # Get response from LLM
             response = self.llm_client.chat_completion(
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,
-                max_tokens=1000
+                max_tokens=self.max_tokens_per_call
             )
-            
+
+            prompt_tokens = max(1, len(prompt) // 4)
+            completion_tokens = max(1, len(response) // 4)
+            self.token_stats["calls"] += 1
+            self.token_stats["prompt_tokens_est"] += prompt_tokens
+            self.token_stats["completion_tokens_est"] += completion_tokens
+            total_est = self.token_stats["prompt_tokens_est"] + self.token_stats["completion_tokens_est"]
+            print(
+                f"[MethodDesign] LLM call={self.token_stats['calls']} "
+                f"prompt~{prompt_tokens} completion~{completion_tokens} total~{total_est}"
+            )
+            if total_est > self.token_budget:
+                raise RuntimeError(
+                    f"Token budget exceeded (~{total_est}>{self.token_budget}). "
+                    "Increase METHOD_DESIGN_TOKEN_BUDGET or reduce rounds/experts."
+                )
+
             # Create discussion message
             message = DiscussionMessage(
                 expert_name=expert_name,
@@ -303,12 +313,12 @@ Focus on potential for surpassing SOTA performance in single-cell perturbation p
                 round=self.current_round,
                 references=[msg.expert_name for msg in (context or [])]
             )
-            
+
             # Add to discussion history
             self.discussion_history.append(message)
-            
+
             return message
-            
+
         except Exception as e:
             print(f"Error generating expert message: {e}")
             # Return a fallback message
@@ -319,11 +329,13 @@ Focus on potential for surpassing SOTA performance in single-cell perturbation p
                 round=self.current_round
             )
 
-    def run_discussion_round(self, experts: List[Dict[str, str]], 
+    def run_discussion_round(self, experts: List[Dict[str, str]],
                            task_analysis: Dict[str, Any]) -> List[DiscussionMessage]:
         """Run a complete discussion round with all experts"""
         round_messages = []
-        
+        if self.fast_mode and len(experts) > 2:
+            experts = experts[:2]
+
         # 1. Initial proposals
         for expert in experts:
             proposal = self.generate_expert_message(
@@ -334,7 +346,7 @@ Focus on potential for surpassing SOTA performance in single-cell perturbation p
                 context=self.discussion_history[-5:] if self.discussion_history else None
             )
             round_messages.append(proposal)
-        
+
         # 2. Expert feedback
         for expert in experts:
             feedback = self.generate_expert_message(
@@ -345,30 +357,52 @@ Focus on potential for surpassing SOTA performance in single-cell perturbation p
                 context=round_messages
             )
             round_messages.append(feedback)
-        
+
         # 3. Questions and clarifications
-        for expert in experts:
-            question = self.generate_expert_message(
-                expert_name=expert['name'],
-                expert_domain=expert['domain'],
-                task_analysis=task_analysis,
-                message_type='question',
-                context=round_messages
-            )
-            round_messages.append(question)
-            
-            # Get answers from other experts
-            for other_expert in experts:
-                if other_expert['name'] != expert['name']:
-                    answer = self.generate_expert_message(
-                        expert_name=other_expert['name'],
-                        expert_domain=other_expert['domain'],
-                        task_analysis=task_analysis,
-                        message_type='answer',
-                        context=round_messages[-5:]
-                    )
-                    round_messages.append(answer)
-        
+        if self.fast_mode:
+            if experts:
+                questioner = experts[0]
+                question = self.generate_expert_message(
+                    expert_name=questioner['name'],
+                    expert_domain=questioner['domain'],
+                    task_analysis=task_analysis,
+                    message_type='question',
+                    context=round_messages
+                )
+                round_messages.append(question)
+            if len(experts) > 1:
+                responder = experts[1]
+                answer = self.generate_expert_message(
+                    expert_name=responder['name'],
+                    expert_domain=responder['domain'],
+                    task_analysis=task_analysis,
+                    message_type='answer',
+                    context=round_messages[-5:]
+                )
+                round_messages.append(answer)
+        else:
+            for expert in experts:
+                question = self.generate_expert_message(
+                    expert_name=expert['name'],
+                    expert_domain=expert['domain'],
+                    task_analysis=task_analysis,
+                    message_type='question',
+                    context=round_messages
+                )
+                round_messages.append(question)
+
+                # Get answers from other experts
+                for other_expert in experts:
+                    if other_expert['name'] != expert['name']:
+                        answer = self.generate_expert_message(
+                            expert_name=other_expert['name'],
+                            expert_domain=other_expert['domain'],
+                            task_analysis=task_analysis,
+                            message_type='answer',
+                            context=round_messages[-5:]
+                        )
+                        round_messages.append(answer)
+
         # 4. Final critique
         critique = self.generate_expert_message(
             expert_name="Critic",
@@ -378,7 +412,7 @@ Focus on potential for surpassing SOTA performance in single-cell perturbation p
             context=round_messages
         )
         round_messages.append(critique)
-        
+
         self.current_round += 1
         return round_messages
 
@@ -404,7 +438,7 @@ Focus on potential for surpassing SOTA performance in single-cell perturbation p
             "critique": None,
             "consensus_score": 0.0
         }
-        
+
         for msg in messages:
             if msg.message_type == 'proposal':
                 output["proposals"].append({
@@ -430,7 +464,7 @@ Focus on potential for surpassing SOTA performance in single-cell perturbation p
                     "score": self.extract_consensus_score(msg)
                 }
                 output["consensus_score"] = output["critique"]["score"]
-        
+
         return output
 
     def _format_perturbations(self, perturbations: List[Dict[str, Any]]) -> str:
@@ -443,22 +477,22 @@ Focus on potential for surpassing SOTA performance in single-cell perturbation p
                 desc += f"  Description: {p['description']}\n"
             formatted.append(desc)
         return '\n'.join(formatted)
-        
+
     def _format_list(self, items: List[str]) -> str:
 
         return '\n'.join(f"- {item}" for item in items)
-        
+
     def _get_relevant_knowledge(self, expert_domain: str, task_type: str, message_type: str) -> str:
         if not self.rag_retriever:
             return ""
-            
+
         cache_key = f"{expert_domain}_{task_type}_{message_type}"
-        
+
         if cache_key in self.knowledge_cache:
             return self.knowledge_cache[cache_key]
-            
+
         query_terms = []
-        
+
         domain_queries = {
             "deep_learning": [
                 "neural network architecture",
@@ -482,10 +516,10 @@ Focus on potential for surpassing SOTA performance in single-cell perturbation p
                 task_type
             ]
         }
-        
+
         if expert_domain.lower() in domain_queries:
             query_terms.extend(domain_queries[expert_domain.lower()])
-            
+
         message_type_queries = {
             "proposal": [
                 "model architecture",
@@ -511,7 +545,7 @@ Focus on potential for surpassing SOTA performance in single-cell perturbation p
 
         if message_type in message_type_queries:
             query_terms.extend(message_type_queries[message_type])
-            
+
         all_results = []
         for query in query_terms:
             try:
@@ -519,29 +553,42 @@ Focus on potential for surpassing SOTA performance in single-cell perturbation p
                 all_results.extend(results)
             except Exception as e:
                 print(f"Warning: Knowledge retrieval failed for query '{query}': {e}")
-                
+
         if all_results:
             formatted_results = []
             seen_content = set()
-            
+
             for result in all_results:
-                content = result.get("content", "")
+                content = (
+                    result.get("abstract")
+                    or result.get("content")
+                    or result.get("snippet")
+                    or ""
+                )
                 if content and content not in seen_content:
-                    score = result.get("relevance_score", 0.0)
+                    score = result.get("score", result.get("relevance_score", 0.0))
                     if score >= 0.5:
-                        formatted_results.append(f"Source: {result.get('source', 'Unknown')}")
+                        formatted_results.append(
+                            f"Evidence ID: {result.get('evidence_id', 'untracked')}"
+                        )
+                        formatted_results.append(
+                            f"Title: {result.get('title', 'Untitled')}"
+                        )
+                        formatted_results.append(
+                            f"Source: {result.get('source', 'Unknown')}"
+                        )
                         formatted_results.append(f"Relevance: {score:.2f}")
                         formatted_results.append(f"Content: {content}\n")
                         seen_content.add(content)
-                        
+
             knowledge_content = "\n".join(formatted_results)
-            
+
             self.knowledge_cache[cache_key] = knowledge_content
-            
+
             return knowledge_content
-            
+
         return ""
-        
+
     def _get_domain_context(self, expert_domain: str) -> str:
         domain_contexts = {
             "deep_learning": """
@@ -556,7 +603,7 @@ Key Considerations for Deep Learning in Single-Cell Analysis:
    - scGPT: Transformer-based model for cell state prediction
    - GEARS: Graph-based model for gene expression prediction
    - CPA: Compositional perturbation autoencoder
-   
+
 3. Common Challenges:
    - High dimensionality of gene expression data
    - Sparsity and dropout in single-cell data
@@ -568,7 +615,7 @@ Key Considerations for Deep Learning in Single-Cell Analysis:
    - Pearson correlation for gene-level accuracy
    - Biological pathway enrichment scores
    - Cell type preservation metrics""",
-            
+
             "single_cell_biology": """
 Key Biological Considerations:
 1. Cell Type Specificity:
@@ -594,7 +641,7 @@ Key Biological Considerations:
    - Batch effects and normalization
    - Cell cycle effects
    - Dropout patterns""",
-            
+
             "data_engineering": """
 Key Data Engineering Considerations:
 1. Data Processing:
@@ -621,13 +668,13 @@ Key Data Engineering Considerations:
    - Outlier detection
    - Data validation procedures"""
         }
-        
-        return domain_contexts.get(expert_domain.lower(), 
+
+        return domain_contexts.get(expert_domain.lower(),
             "No specific domain context available for this expert type.")
-    
+
     def _fill_missing_fields(self, task_analysis: Dict[str, Any], missing_fields: List[str]) -> Dict[str, Any]:
         task_analysis = task_analysis.copy()
-        
+
         defaults = {
             'task_type': 'perturbation_prediction',
             'dataset': {
@@ -660,40 +707,40 @@ Key Data Engineering Considerations:
                 'F1-score'
             ]
         }
-        
+
         for field in missing_fields:
             if field in defaults:
                 task_analysis[field] = defaults[field]
                 print(f"Added default value for {field}")
-        
+
         return task_analysis
-        
+
     def _validate_llm_config(self):
         if not self.llm_client:
             raise ValueError("LLM client not initialized")
-            
+
         config_status = self.llm_client.get_config_status()
-        
+
         providers_configured = [
             k for k, v in config_status.items()
             if k.endswith('_configured') and v
         ]
-        
+
         if not providers_configured:
             raise ValueError(
                 "No LLM providers configured. Please set up at least one provider "
                 "(OpenAI, Anthropic, DeepSeek, etc.) with valid API keys."
             )
-            
+
         print(f"✅ LLM configured with providers: {', '.join(p.replace('_configured', '') for p in providers_configured)}")
         print(f"Using model: {config_status.get('model_name', 'default')}")
-            
+
     def save_discussion_log(self, output_dir: str):
         """Save discussion history to file"""
         os.makedirs(output_dir, exist_ok=True)
-        
+
         output_file = os.path.join(output_dir, f"discussion_round_{self.current_round}.json")
-        
+
         discussion_log = {
             "total_rounds": self.current_round,
             "messages": [
@@ -708,7 +755,7 @@ Key Data Engineering Considerations:
                 for msg in self.discussion_history
             ]
         }
-        
+
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(discussion_log, f, indent=2, ensure_ascii=False)
 
@@ -726,6 +773,6 @@ Key Data Engineering Considerations:
                 for i in range(self.current_round + 1)
             ]
         }
-        
+
         with open(summary_file, 'w', encoding='utf-8') as f:
             json.dump(summary, f, indent=2, ensure_ascii=False)

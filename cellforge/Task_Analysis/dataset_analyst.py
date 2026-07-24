@@ -1,64 +1,53 @@
 from typing import Dict, Any, List
 from datetime import datetime
-import os
 import json
 
-try:
-    from .data_structures import AnalysisResult
-    from .rag import RAGSystem
-    from .knowledge_base import knowledge_base
-    from ..llm import LLMInterface
-except ImportError:
-    import sys
-    import os
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from data_structures import AnalysisResult
-    from rag import RAGSystem
-    from knowledge_base import knowledge_base
-    from cellforge.llm import LLMInterface
+from .data_structures import AnalysisResult
+from .knowledge_base import knowledge_base
+from ..llm import LLMInterface
 
 class DatasetAnalyst:
     """Expert agent for analyzing dataset characteristics and quality"""
-    
-    def __init__(self, rag_system: RAGSystem):
+
+    def __init__(self, rag_system):
         self.rag_system = rag_system
-        
+
         self.llm = LLMInterface()
-    
+
     def analyze_dataset(self, task_description: str, dataset_info: Dict[str, Any],
                        retrieved_papers: List[Dict[str, Any]]) -> AnalysisResult:
         """
         Analyze dataset characteristics and quality using knowledge base
-        
+
         Args:
             task_description: Description of the research task
             dataset_info: Dictionary containing dataset metadata
             retrieved_papers: List of relevant papers from vector database
-            
+
         Returns:
             AnalysisResult with dataset analysis
         """
         # 使用knowledge base而不是重复搜索
         knowledge_items = knowledge_base.search_both_databases(
-            knowledge_type="papers", 
+            knowledge_type="papers",
             query=task_description,
             limit=10
         )
-        
+
         # 获取决策支持信息
         decision_support_items = knowledge_base.search_both_databases(
             knowledge_type="decision_support",
             query=task_description,
             limit=5
         )
-        
+
         # 获取实验设计信息
         experimental_design_items = knowledge_base.search_both_databases(
             knowledge_type="experimental_designs",
             query=task_description,
             limit=5
         )
-        
+
         # 合并所有论文信息
         all_papers = retrieved_papers + [
             {
@@ -69,23 +58,23 @@ class DatasetAnalyst:
             }
             for item in knowledge_items
         ]
-        
+
         # 合并决策支持信息
         decision_support = {}
         for item in decision_support_items:
             decision_support.update(item.content)
-        
+
         # 合并实验设计信息
         experimental_designs = [item.content for item in experimental_design_items]
-        
+
         # Format prompt with task information and retrieved papers
         prompt = self._format_prompt_with_decision_support(
             task_description, dataset_info, all_papers, decision_support, experimental_designs
         )
-        
+
         # Run analysis (implementation depends on your LLM backend)
         analysis_content = self._run_llm(prompt)
-        
+
         return AnalysisResult(
             content=analysis_content,
             confidence_score=1.0,  # 临时设置，后续会由其他模块计算
@@ -101,7 +90,7 @@ class DatasetAnalyst:
                 "decision_support": decision_support
             }
         )
-    
+
     def _format_prompt(self, task_description: str, dataset_info: Dict[str, Any],
                       retrieved_papers: List[Dict[str, Any]]) -> str:
         """Format prompt for dataset analysis"""
@@ -109,7 +98,7 @@ class DatasetAnalyst:
             f"- {paper.get('title', 'No title')}: {paper.get('abstract', paper.get('content', paper.get('snippet', 'No content')))[:200]}..."
             for paper in retrieved_papers[:5]
         ])
-        
+
         return f"""You are an expert in single-cell dataset analysis, specializing in evaluating single-cell perturbation data. Your task is to provide a comprehensive analysis of dataset characteristics and quality, focusing on experimental design, data properties, preprocessing recommendations, and quality assessment.
 
 1. Analyze Experimental Design:
@@ -398,7 +387,7 @@ Please provide a comprehensive analysis in the following JSON format:
             f"- {paper.get('title', 'No title')}: {paper.get('abstract', paper.get('content', paper.get('snippet', 'No content')))[:200]}..."
             for paper in papers[:5]
         ])
-        
+
         # 格式化决策支持信息
         decision_context = ""
         if decision_support:
@@ -408,7 +397,7 @@ Data Preparation: {json.dumps(decision_support.get('data_preparation', {}), inde
 Implementation Plan: {json.dumps(decision_support.get('implementation_plan', {}), indent=2)}
 Risk Assessment: {json.dumps(decision_support.get('risk_assessment', {}), indent=2)}
 """
-        
+
         # 格式化实验设计信息
         design_context = ""
         if experimental_designs:
@@ -416,7 +405,7 @@ Risk Assessment: {json.dumps(decision_support.get('risk_assessment', {}), indent
 EXPERIMENTAL DESIGNS:
 {chr(10).join([f"- {design['title']}: {design['content'][:200]}..." for design in experimental_designs[:3]])}
 """
-        
+
         return f"""You are an expert in single-cell dataset analysis, specializing in evaluating single-cell perturbation data. Your task is to provide a comprehensive analysis of dataset characteristics and quality, focusing on experimental design, data properties, preprocessing recommendations, and quality assessment.
 
 {decision_context}
@@ -674,30 +663,30 @@ Please provide a comprehensive analysis in the following JSON format, incorporat
         """Run LLM with retry mechanism for network errors"""
         max_retries = 3
         retry_delay = 5  # seconds
-        
+
         for attempt in range(max_retries):
             try:
                 print(f"🔄 LLM attempt {attempt + 1}/{max_retries}")
-                
+
                 system_prompt = "You are an expert in single-cell dataset analysis. Provide your response in valid JSON format."
-                
+
                 # 使用统一的LLMInterface
                 response = self.llm.generate(prompt, system_prompt)
-                
+                content = response.get("content") or ""
+
                 # Parse the response content as JSON
                 try:
-                    return json.loads(response["content"])
+                    return json.loads(content)
                 except json.JSONDecodeError:
                     # If direct parsing fails, try to extract JSON from markdown code blocks
                     import re
-                    content = response["content"]
                     json_match = re.search(r'```json\n(.*?)\n```', content, re.DOTALL)
                     if json_match:
                         return json.loads(json_match.group(1))
                     else:
                         # Return the raw content if JSON parsing fails
                         return {"content": content, "error": "Failed to parse JSON response"}
-                        
+
             except Exception as e:
                 error_msg = str(e)
                 if "Connection broken" in error_msg or "InvalidChunkLength" in error_msg:
@@ -731,6 +720,6 @@ Please provide a comprehensive analysis in the following JSON format, incorporat
                 else:
                     # 其他错误直接抛出
                     raise Exception(f"LLM generation failed: {error_msg}")
-        
+
         # 如果所有重试都失败
-        return {"content": "LLM generation failed after all retries", "error": "Connection issues"} 
+        return {"content": "LLM generation failed after all retries", "error": "Connection issues"}

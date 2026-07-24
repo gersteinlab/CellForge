@@ -3,85 +3,90 @@ from datetime import datetime
 import os
 import json
 
-try:
-    from .data_structures import AnalysisResult, TaskAnalysisReport
-    from .rag import RAGSystem
-    from ..llm import LLMInterface
-except ImportError:
-    from data_structures import AnalysisResult, TaskAnalysisReport
-    from rag import RAGSystem
-    from cellforge.llm import LLMInterface
+from .data_structures import AnalysisResult, TaskAnalysisReport
+from ..llm import LLMInterface
 
 class RefinementAgent:
     """Expert agent for refining and integrating analysis results"""
-    
-    def __init__(self, rag_system: RAGSystem):
+
+    def __init__(self, rag_system):
         self.rag_system = rag_system
-        
+
         self.llm = LLMInterface()
-        
-        self.max_iterations = 3
-        
+
+        self.max_iterations = max(
+            0, int(os.getenv("TASK_ANALYSIS_MAX_REFINEMENT_ROUNDS", "3"))
+        )
+
     def refine_analysis(self, dataset_analysis: AnalysisResult,
                        problem_investigation: AnalysisResult,
                        baseline_assessment: AnalysisResult) -> TaskAnalysisReport:
         """
         Refine and integrate analysis results with decision support
-        
+
         Args:
             dataset_analysis: Analysis of dataset characteristics
             problem_investigation: Investigation of research problem
             baseline_assessment: Assessment of baseline models
-            
+
         Returns:
             TaskAnalysisReport with refined analysis
         """
-        
+
         task_description = self._extract_task_description(dataset_analysis, problem_investigation, baseline_assessment)
         dataset_info = self._extract_dataset_info(dataset_analysis)
-        
-        
+
+
         decision_support = self.rag_system.get_decision_support(task_description, dataset_info)
-        
-        
+
+
         current_iteration = 0
         refined_dataset = dataset_analysis
         refined_problem = problem_investigation
         refined_baseline = baseline_assessment
-        
+
         while current_iteration < self.max_iterations:
-            
+
             comments = self._generate_refinement_comments_with_decision_support(
                 refined_dataset, refined_problem, refined_baseline, decision_support
             )
-            
-            
+
+            # Open-ended model providers can return valid prose, truncated JSON,
+            # or a JSON object that omits one of the requested sections. Keep the
+            # pipeline useful in those cases instead of failing on comments[key].
+            if not isinstance(comments, dict):
+                comments = {"content": str(comments)}
+            fallback_comments = {
+                "note": comments.get("content", "No section-specific comments returned"),
+                "parse_error": comments.get("error"),
+            }
+
             refined_dataset = self._refine_dataset_analysis(
-                refined_dataset, comments["dataset"]
+                refined_dataset, comments.get("dataset", fallback_comments)
             )
             refined_problem = self._refine_problem_investigation(
-                refined_problem, comments["problem"]
+                refined_problem, comments.get("problem", fallback_comments)
             )
             refined_baseline = self._refine_baseline_assessment(
-                refined_baseline, comments["baseline"]
+                refined_baseline, comments.get("baseline", fallback_comments)
             )
-            
+
             current_iteration += 1
-        
-        
+
+
         recommendations = self._generate_final_recommendations_with_decision_support(
             refined_dataset, refined_problem, refined_baseline, decision_support
         )
-        
+
         return TaskAnalysisReport(
             dataset_analysis=refined_dataset,
             problem_investigation=refined_problem,
             baseline_assessment=refined_baseline,
-            refinement_comments=[],  
+            refinement_comments=[],
             final_recommendations=recommendations,
             timestamp=datetime.now()
         )
-    
+
     def _generate_refinement_comments(self, dataset_analysis: AnalysisResult,
                                     problem_investigation: AnalysisResult,
                                     baseline_assessment: AnalysisResult) -> Dict[str, Any]:
@@ -89,12 +94,12 @@ class RefinementAgent:
         prompt = self._format_refinement_prompt(
             dataset_analysis, problem_investigation, baseline_assessment
         )
-        
-        
+
+
         comments = self._run_llm(prompt)
-        
+
         return comments
-    
+
     def _format_refinement_prompt(self, dataset_analysis: AnalysisResult,
                                 problem_investigation: AnalysisResult,
                                 baseline_assessment: AnalysisResult) -> str:
@@ -369,52 +374,99 @@ Please provide refinement comments in the following JSON format:
         }}
     }}
 }}"""
-    
+
     def _refine_dataset_analysis(self, analysis: AnalysisResult,
                                comments: Dict[str, Any]) -> AnalysisResult:
         """Refine dataset analysis based on comments"""
         prompt = self._format_dataset_refinement_prompt(analysis.content, comments)
-        
-        
+
+
         refined_content = self._run_llm(prompt)
-        
+
         return AnalysisResult(
             content=refined_content,
-            confidence_score=1.0,  
+            confidence_score=1.0,
             timestamp=datetime.now(),
             metadata={"agent": "Dataset Analyst"}
         )
-    
+
     def _refine_problem_investigation(self, investigation: AnalysisResult,
                                     comments: Dict[str, Any]) -> AnalysisResult:
         """Refine problem investigation based on comments"""
         prompt = self._format_problem_refinement_prompt(investigation.content, comments)
-        
-        
+
+
         refined_content = self._run_llm(prompt)
-        
+
         return AnalysisResult(
             content=refined_content,
-            confidence_score=1.0,  
+            confidence_score=1.0,
             timestamp=datetime.now(),
             metadata={"agent": "Problem Investigator"}
         )
-    
+
     def _refine_baseline_assessment(self, assessment: AnalysisResult,
                                   comments: Dict[str, Any]) -> AnalysisResult:
         """Refine baseline assessment based on comments"""
         prompt = self._format_baseline_refinement_prompt(assessment.content, comments)
-        
-        
+
+
         refined_content = self._run_llm(prompt)
-        
+
         return AnalysisResult(
             content=refined_content,
-            confidence_score=1.0,  
+            confidence_score=1.0,
             timestamp=datetime.now(),
             metadata={"agent": "Baseline Assessor"}
         )
-    
+
+    def _format_dataset_refinement_prompt(self, analysis_content: Dict[str, Any],
+                                        comments: Dict[str, Any]) -> str:
+        """Build a refinement prompt for dataset analysis."""
+        return self._format_single_refinement_prompt(
+            section_name="Dataset Analysis",
+            analysis_content=analysis_content,
+            comments=comments
+        )
+
+    def _format_problem_refinement_prompt(self, investigation_content: Dict[str, Any],
+                                        comments: Dict[str, Any]) -> str:
+        """Build a refinement prompt for problem investigation."""
+        return self._format_single_refinement_prompt(
+            section_name="Problem Investigation",
+            analysis_content=investigation_content,
+            comments=comments
+        )
+
+    def _format_baseline_refinement_prompt(self, assessment_content: Dict[str, Any],
+                                         comments: Dict[str, Any]) -> str:
+        """Build a refinement prompt for baseline assessment."""
+        return self._format_single_refinement_prompt(
+            section_name="Baseline Assessment",
+            analysis_content=assessment_content,
+            comments=comments
+        )
+
+    def _format_single_refinement_prompt(self, section_name: str,
+                                       analysis_content: Dict[str, Any],
+                                       comments: Dict[str, Any]) -> str:
+        """Format a section-specific refinement prompt and request JSON output."""
+        return f"""You are refining the {section_name} for a scientific task analysis.
+Apply the reviewer comments to improve accuracy, completeness, and implementation usefulness.
+
+SECTION TO REFINE:
+{json.dumps(analysis_content, indent=2)}
+
+REVIEWER COMMENTS:
+{json.dumps(comments, indent=2)}
+
+Requirements:
+1. Keep the same high-level structure when possible.
+2. Resolve issues called out in the comments.
+3. Add explicit assumptions where information is missing.
+4. Return only valid JSON (no markdown).
+"""
+
     def _generate_final_recommendations(self, dataset_analysis: AnalysisResult,
                                       problem_investigation: AnalysisResult,
                                       baseline_assessment: AnalysisResult) -> Dict[str, Any]:
@@ -422,12 +474,12 @@ Please provide refinement comments in the following JSON format:
         prompt = self._format_recommendations_prompt(
             dataset_analysis, problem_investigation, baseline_assessment
         )
-        
-        
+
+
         recommendations = self._run_llm(prompt)
-        
+
         return recommendations
-    
+
     def _format_recommendations_prompt(self, dataset_analysis: AnalysisResult,
                                      problem_investigation: AnalysisResult,
                                      baseline_assessment: AnalysisResult) -> str:
@@ -720,45 +772,49 @@ Please provide final recommendations in the following JSON format:
         }}
     }}
 }}"""
-    
+
     def _run_llm(self, prompt: str) -> Dict[str, Any]:
         system_prompt = "You are an expert in scientific analysis integration. Provide your response in valid JSON format."
-        
+
         try:
             response = self.llm.generate(prompt, system_prompt)
-            
+            content = response.get("content") or ""
+
             try:
-                return json.loads(response["content"])
+                return json.loads(content)
             except json.JSONDecodeError:
-                
+
                 import re
-                content = response["content"]
                 json_match = re.search(r'```json\n(.*?)\n```', content, re.DOTALL)
                 if json_match:
                     return json.loads(json_match.group(1))
                 else:
-                    
+
                     return {"content": content, "error": "Failed to parse JSON response"}
         except Exception as e:
-            raise Exception(f"LLM generation failed: {str(e)}")
+            return {
+                "content": "",
+                "error": f"LLM generation failed: {str(e)}",
+                "degraded": True,
+            }
 
     def _extract_task_description(self, dataset_analysis: AnalysisResult,
                                  problem_investigation: AnalysisResult,
                                  baseline_assessment: AnalysisResult) -> str:
         """Extract task description from problem investigation"""
-        
+
         if hasattr(problem_investigation, 'content') and problem_investigation.content:
             if isinstance(problem_investigation.content, dict):
                 return problem_investigation.content.get('task_description', 'single cell perturbation prediction')
         return 'single cell perturbation prediction'
-    
+
     def _extract_dataset_info(self, dataset_analysis: AnalysisResult) -> Dict[str, Any]:
         """Extract dataset information from dataset analysis"""
         if hasattr(dataset_analysis, 'content') and dataset_analysis.content:
             if isinstance(dataset_analysis.content, dict):
                 return dataset_analysis.content.get('dataset_info', {})
         return {}
-    
+
     def _generate_refinement_comments_with_decision_support(self, dataset_analysis: AnalysisResult,
                                                           problem_investigation: AnalysisResult,
                                                           baseline_assessment: AnalysisResult,
@@ -767,12 +823,12 @@ Please provide final recommendations in the following JSON format:
         prompt = self._format_refinement_prompt_with_decision_support(
             dataset_analysis, problem_investigation, baseline_assessment, decision_support
         )
-        
-        
+
+
         comments = self._run_llm(prompt)
-        
+
         return comments
-    
+
     def _generate_final_recommendations_with_decision_support(self, dataset_analysis: AnalysisResult,
                                                             problem_investigation: AnalysisResult,
                                                             baseline_assessment: AnalysisResult,
@@ -781,19 +837,19 @@ Please provide final recommendations in the following JSON format:
         prompt = self._format_recommendations_prompt_with_decision_support(
             dataset_analysis, problem_investigation, baseline_assessment, decision_support
         )
-        
-        
+
+
         recommendations = self._run_llm(prompt)
-        
+
         return recommendations
-    
+
     def _format_refinement_prompt_with_decision_support(self, dataset_analysis: AnalysisResult,
                                                       problem_investigation: AnalysisResult,
                                                       baseline_assessment: AnalysisResult,
                                                       decision_support: Dict[str, Any]) -> str:
         """Format prompt for generating refinement comments with decision support"""
-        
-        
+
+
         decision_context = ""
         if decision_support:
             decision_context = f"""
@@ -804,7 +860,7 @@ Data Preparation: {json.dumps(decision_support.get('data_preparation', {}), inde
 Implementation Plan: {json.dumps(decision_support.get('implementation_plan', {}), indent=2)}
 Risk Assessment: {json.dumps(decision_support.get('risk_assessment', {}), indent=2)}
 """
-        
+
         return f"""You are an expert in scientific analysis integration with extensive experience in refining and improving research analyses. Your task is to provide comprehensive refinement comments for dataset analysis, problem investigation, and baseline assessment, focusing on integration, consistency, and improvement with decision support.
 
 {decision_context}
@@ -1083,14 +1139,14 @@ Please provide refinement comments in the following JSON format, incorporating d
         }}
     }}
 }}"""
-    
+
     def _format_recommendations_prompt_with_decision_support(self, dataset_analysis: AnalysisResult,
                                                            problem_investigation: AnalysisResult,
                                                            baseline_assessment: AnalysisResult,
                                                            decision_support: Dict[str, Any]) -> str:
         """Format prompt for generating final recommendations with decision support"""
-        
-        
+
+
         decision_context = ""
         if decision_support:
             decision_context = f"""
@@ -1101,7 +1157,7 @@ Data Preparation: {json.dumps(decision_support.get('data_preparation', {}), inde
 Implementation Plan: {json.dumps(decision_support.get('implementation_plan', {}), indent=2)}
 Risk Assessment: {json.dumps(decision_support.get('risk_assessment', {}), indent=2)}
 """
-        
+
         return f"""You are an expert in scientific analysis integration with extensive experience in generating comprehensive recommendations for research projects. Your task is to provide final recommendations based on the integrated analysis results, incorporating decision support information.
 
 {decision_context}
@@ -1254,4 +1310,4 @@ Please provide comprehensive final recommendations in the following JSON format,
             "decision_support_success": "string"
         }}
     }}
-}}""" 
+}}"""
