@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 from .base import CodeGenerationBackend
+from .codex_events import AgentEventLog
 from .contracts import AgentRunRequest, AgentRunResult
 from .verifier import (
     DEFAULT_MAX_REPAIR_ROUNDS,
@@ -41,7 +42,19 @@ def _write_verification_report(
         json.dumps(verification.to_dict(), ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+    os.chmod(report_path, 0o600)
     return report_path
+
+
+def _record_orchestration_event(result: AgentRunResult, event: str, **details) -> None:
+    if result.event_log is None:
+        return
+    AgentEventLog(result.event_log).append(
+        event,
+        backend=result.backend,
+        attempt=result.attempt,
+        **details,
+    )
 
 
 def run_with_verification(
@@ -65,11 +78,19 @@ def run_with_verification(
         )
 
     result = backend.run(request)
+    _record_orchestration_event(result, "verification_started")
     verification = verify_generated_code(
         result.output_path,
         workspace=result.workspace,
     )
-    _write_verification_report(result, verification)
+    report_path = _write_verification_report(result, verification)
+    _record_orchestration_event(
+        result,
+        "verification_completed",
+        passed=verification.passed,
+        report=str(report_path.relative_to(result.workspace)),
+        failed_checks=[check.name for check in verification.failures],
+    )
 
     # Repair prompts are for artifacts that the agent successfully delivered
     # but that failed deterministic checks. Authentication, CLI startup,
@@ -84,12 +105,26 @@ def run_with_verification(
             round_number=result.attempt,
             max_rounds=repair_budget,
         )
+        _record_orchestration_event(
+            result,
+            "repair_started",
+            next_attempt=result.attempt + 1,
+            failed_checks=[check.name for check in verification.failures],
+        )
         result = backend.continue_run(result, feedback)
+        _record_orchestration_event(result, "verification_started")
         verification = verify_generated_code(
             result.output_path,
             workspace=result.workspace,
         )
-        _write_verification_report(result, verification)
+        report_path = _write_verification_report(result, verification)
+        _record_orchestration_event(
+            result,
+            "verification_completed",
+            passed=verification.passed,
+            report=str(report_path.relative_to(result.workspace)),
+            failed_checks=[check.name for check in verification.failures],
+        )
 
     if result.status == "completed" and not verification.passed:
         result.status = "failed"
@@ -97,4 +132,11 @@ def run_with_verification(
             f"Artifact failed deterministic verification after "
             f"{result.attempt} attempt(s)"
         )
+    _record_orchestration_event(
+        result,
+        "generation_finished",
+        status=result.status,
+        passed=verification.passed,
+        error=result.error,
+    )
     return result, verification

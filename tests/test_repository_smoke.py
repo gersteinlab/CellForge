@@ -179,6 +179,7 @@ def test_codex_command_uses_workspace_sandbox_and_non_git_workspace(tmp_path):
 
     assert command[0:2] == [backend.codex_bin, "exec"]
     assert command[command.index("--sandbox") + 1] == "workspace-write"
+    assert "--json" in command
     assert "--skip-git-repo-check" in command
     assert "--dangerously-bypass-approvals-and-sandbox" not in command
 

@@ -1,14 +1,17 @@
 """Workspace lifecycle for the Codex CLI code-generation backend."""
 
 import json
+import os
 import re
 import shutil
 import subprocess
+import threading
 import uuid
-from datetime import datetime, timezone
+from collections import deque
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
+from .codex_events import AgentEventLog, CodexJsonlRecorder, safe_text
 from .contracts import AgentRunRequest, AgentRunResult
 from .prompts import build_generation_prompt, build_repair_prompt
 
@@ -77,19 +80,17 @@ def _snapshot(workspace: Path) -> Dict[str, Tuple[int, int]]:
     snapshot: Dict[str, Tuple[int, int]] = {}
     for path in workspace.rglob("*"):
         if path.is_file():
+            relative = path.relative_to(workspace)
+            if "logs" in relative.parts or "__pycache__" in relative.parts:
+                continue
             stat = path.stat()
-            snapshot[str(path.relative_to(workspace))] = (stat.st_size, stat.st_mtime_ns)
+            snapshot[str(relative)] = (stat.st_size, stat.st_mtime_ns)
     return snapshot
 
 
 def _changed_files(before: Dict[str, Tuple[int, int]], workspace: Path) -> List[str]:
     after = _snapshot(workspace)
     return sorted(name for name, signature in after.items() if before.get(name) != signature)
-
-
-def _append_event(path: Path, event: dict) -> None:
-    with path.open("a", encoding="utf-8") as stream:
-        stream.write(json.dumps(event, ensure_ascii=False, default=str) + "\n")
 
 
 def _artifact_path(request: AgentRunRequest) -> Path:
@@ -118,8 +119,12 @@ def execute_agent(
     prepare_workspace(request)
     logs_dir = request.workspace / "logs"
     logs_dir.mkdir(exist_ok=True)
+    os.chmod(logs_dir, 0o700)
     event_log = logs_dir / "agent_events.jsonl"
+    raw_event_log = logs_dir / f"{backend}_events_raw_attempt_{request.attempt:02d}.jsonl"
+    stderr_log = logs_dir / f"{backend}_stderr_attempt_{request.attempt:02d}.log"
     final_message_path = logs_dir / f"{backend}_attempt_{request.attempt:02d}.txt"
+    recorder = AgentEventLog(event_log)
     before = _snapshot(request.workspace)
     prompt = (
         build_repair_prompt(request.feedback, request.entrypoint)
@@ -127,50 +132,105 @@ def execute_agent(
         else build_generation_prompt(request.research_plan, request.entrypoint)
     )
     command, env = command_factory(request, final_message_path)
-    started = datetime.now(timezone.utc).isoformat()
-    _append_event(
-        event_log,
-        {
-            "event": "agent_started",
-            "backend": backend,
-            "attempt": request.attempt,
-            "started_at": started,
-            "command": command,
-        },
+    recorder.append(
+        "agent_started",
+        backend=backend,
+        attempt=request.attempt,
+        command=command,
     )
 
+    stream_recorder = CodexJsonlRecorder(
+        raw_log=raw_event_log,
+        event_log=recorder,
+        backend=backend,
+        attempt=request.attempt,
+    )
+    stderr_tail: deque[str] = deque(maxlen=200)
+    stderr_log.write_text("", encoding="utf-8")
+    os.chmod(stderr_log, 0o600)
+    reader_errors: list[BaseException] = []
+    process: Optional[subprocess.Popen] = None
+    stdout_thread: Optional[threading.Thread] = None
+    stderr_thread: Optional[threading.Thread] = None
+
+    def read_stdout() -> None:
+        try:
+            assert process is not None and process.stdout is not None
+            for line in process.stdout:
+                stream_recorder.record_line(line)
+        except BaseException as exc:  # surfaced on the controlling thread below
+            reader_errors.append(exc)
+
+    def read_stderr() -> None:
+        try:
+            assert process is not None and process.stderr is not None
+            with stderr_log.open("a", encoding="utf-8") as stream:
+                for line in process.stderr:
+                    stream.write(line)
+                    stream.flush()
+                    stderr_tail.append(line)
+        except BaseException as exc:  # surfaced on the controlling thread below
+            reader_errors.append(exc)
+
     try:
-        completed = subprocess.run(
+        process = subprocess.Popen(
             command,
             cwd=request.workspace,
             env=env,
-            input=prompt,
-            capture_output=True,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=request.timeout_seconds,
-            check=False,
+            bufsize=1,
         )
-    except subprocess.TimeoutExpired as exc:
-        message = (exc.stdout or "") if isinstance(exc.stdout, str) else ""
+        stdout_thread = threading.Thread(
+            target=read_stdout, name="codex-stdout", daemon=True
+        )
+        stderr_thread = threading.Thread(
+            target=read_stderr, name="codex-stderr", daemon=True
+        )
+        stdout_thread.start()
+        stderr_thread.start()
+        assert process.stdin is not None
+        process.stdin.write(prompt)
+        process.stdin.close()
+        returncode = process.wait(timeout=request.timeout_seconds)
+        stdout_thread.join()
+        stderr_thread.join()
+        if reader_errors:
+            raise OSError(f"Failed to record Codex output: {reader_errors[0]}")
+    except subprocess.TimeoutExpired:
+        assert process is not None
+        process.kill()
+        process.wait()
+        assert stdout_thread is not None and stderr_thread is not None
+        stdout_thread.join()
+        stderr_thread.join()
+        message = ""
         error = f"{backend} timed out after {request.timeout_seconds} seconds"
         status = "timeout"
         returncode = None
     except OSError as exc:
+        if process is not None and process.poll() is None:
+            process.kill()
+            process.wait()
+        for thread in (stdout_thread, stderr_thread):
+            if thread is not None:
+                thread.join()
         message = ""
         error = str(exc)
         status = "failed"
         returncode = None
     else:
-        returncode = completed.returncode
         message = ""
         if final_message_path.exists():
             message = final_message_path.read_text(encoding="utf-8", errors="replace")
         if not message:
-            message = completed.stdout or completed.stderr or ""
-        if completed.returncode != 0:
+            message = "".join(stderr_tail)
+        if returncode != 0:
             status = "failed"
-            error = (completed.stderr or completed.stdout or "").strip() or (
-                f"{backend} exited with status {completed.returncode}"
+            error = "".join(stderr_tail).strip() or (
+                f"{backend} exited with status {returncode}"
             )
         elif not artifact.is_file() or artifact.stat().st_size == 0:
             status = "failed"
@@ -179,30 +239,35 @@ def execute_agent(
             status = "completed"
             error = None
 
+    if final_message_path.exists():
+        os.chmod(final_message_path, 0o600)
+    stream_state = stream_recorder.state
     changed = _changed_files(before, request.workspace)
-    _append_event(
-        event_log,
-        {
-            "event": "agent_finished",
-            "backend": backend,
-            "attempt": request.attempt,
-            "finished_at": datetime.now(timezone.utc).isoformat(),
-            "status": status,
-            "returncode": returncode,
-            "changed_files": changed,
-            "error": error,
-        },
+    recorder.append(
+        "agent_finished",
+        backend=backend,
+        attempt=request.attempt,
+        status=status,
+        returncode=returncode,
+        changed_files=changed,
+        error=safe_text(error),
+        raw_event_count=stream_state.raw_event_count,
+        malformed_line_count=stream_state.malformed_line_count,
     )
     return AgentRunResult(
         status=status,
         backend=backend,
         workspace=request.workspace,
         entrypoint=request.entrypoint,
-        session_id=request.workspace.name,
+        session_id=stream_state.session_id or request.workspace.name,
         attempt=request.attempt,
         changed_files=changed,
         final_message=message,
         event_log=event_log,
+        raw_event_log=raw_event_log,
+        stderr_log=stderr_log,
+        event_count=stream_state.raw_event_count,
+        usage=stream_state.usage,
         error=error,
     )
 

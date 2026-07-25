@@ -35,6 +35,9 @@ class AgentRunResult:
     changed_files: List[str] = field(default_factory=list)
     final_message: str = ""
     event_log: Optional[Path] = None
+    raw_event_log: Optional[Path] = None
+    stderr_log: Optional[Path] = None
+    event_count: int = 0
     usage: Dict[str, Any] = field(default_factory=dict)
     error: Optional[str] = None
 

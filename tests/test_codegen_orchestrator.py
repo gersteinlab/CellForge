@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from cellforge.Code_Generation.base import CodeGenerationBackend
@@ -36,6 +37,8 @@ class RepairingBackend(CodeGenerationBackend):
         return self._result(request)
 
     def _result(self, request):
+        event_log = Path(request.workspace) / "logs" / "agent_events.jsonl"
+        event_log.parent.mkdir(parents=True, exist_ok=True)
         result = AgentRunResult(
             status="completed",
             backend=self.name,
@@ -43,6 +46,7 @@ class RepairingBackend(CodeGenerationBackend):
             entrypoint=request.entrypoint,
             session_id="cellforge-test-session",
             attempt=request.attempt,
+            event_log=event_log,
         )
         self.last_result = result
         return result
@@ -93,6 +97,14 @@ def test_orchestrator_repairs_in_same_workspace(tmp_path):
     assert verification.passed
     assert (tmp_path / "logs" / "verification_attempt_01.json").exists()
     assert (tmp_path / "logs" / "verification_attempt_02.json").exists()
+    events = [
+        json.loads(line)
+        for line in (tmp_path / "logs" / "agent_events.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert events[-1]["event"] == "generation_finished"
+    assert events[-1]["status"] == "completed"
 
 
 def test_orchestrator_does_not_retry_or_mask_process_failure(tmp_path):

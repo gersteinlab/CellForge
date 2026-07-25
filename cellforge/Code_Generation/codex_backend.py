@@ -77,6 +77,7 @@ class CodexCodeGenerator(CodeGenerationBackend):
             "--ephemeral",
             "--ignore-user-config",
             "--ignore-rules",
+            "--json",
             "--sandbox",
             "workspace-write",
             "--skip-git-repo-check",

@@ -155,9 +155,16 @@ cellforge --phase code_generation --codegen-backend codex
 ```
 
 Agent traces and verifier reports are stored under
-`<output_dir>/.cellforge_workspaces/`. A generated `result.py` or
-`result_<task_id>.py` is published only after deterministic verification
-passes.
+`<output_dir>/.cellforge_workspaces/`. Each workspace keeps the original Codex
+JSONL stream, a provider-neutral `logs/agent_events.jsonl` timeline, stderr,
+the final agent message, and one verification report per attempt. A generated
+`result.py` or `result_<task_id>.py` is published only after deterministic
+verification passes.
+
+Codex events are recorded as they arrive. Raw events, stderr, and final-message
+files may contain model-generated command/output content, so CellForge stores
+the logs with owner-only permissions; do not publish a workspace without
+reviewing it.
 
 Codex additionally enforces its `workspace-write` OS sandbox.
 
