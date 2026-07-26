@@ -217,13 +217,31 @@ def _run_codex_autoresearch(
     if shutil.which("node") is None or shutil.which("npm") is None:
         return
 
-    project_root = Path(__file__).resolve().parents[2]
-    sdk_script = Path(__file__).resolve().parent / "codex_agent_sdk.mjs"
-    node_pkg = project_root / "node_modules" / "@openai" / "codex-sdk"
+    sdk_source = Path(__file__).resolve().parent / "codex_agent_sdk.mjs"
+    sdk_runtime = logs_dir / ".codex_sdk_runtime"
+    sdk_runtime.mkdir(parents=True, exist_ok=True)
+    sdk_script = sdk_runtime / "codex_agent_sdk.mjs"
+    shutil.copy2(sdk_source, sdk_script)
+    package_json = sdk_runtime / "package.json"
+    if not package_json.exists():
+        package_json.write_text(
+            json.dumps(
+                {
+                    "name": "cellforge-codex-autorun-runtime",
+                    "private": True,
+                    "type": "module",
+                    "dependencies": {"@openai/codex-sdk": "0.116.0"},
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+    node_pkg = sdk_runtime / "node_modules" / "@openai" / "codex-sdk"
     if not node_pkg.exists():
         subprocess.run(
-            ["npm", "install", "--silent"],
-            cwd=project_root,
+            ["npm", "install", "--silent", "--no-audit", "--no-fund"],
+            cwd=sdk_runtime,
             capture_output=True,
             text=True,
             check=False,
@@ -296,7 +314,7 @@ Current file content:
                 str(out_file),
             ],
             text=True,
-            cwd=project_root,
+            cwd=sdk_runtime,
             capture_output=True,
             timeout=1800,
             check=False,

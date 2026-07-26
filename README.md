@@ -33,8 +33,8 @@ conda activate cellforge
 Install the package:
 
 ```bash
-git clone git@github.com:GabbyKoki/cellforge-new.git
-cd cellforge-new
+git clone git@github.com:gersteinlab/CellForge.git
+cd CellForge
 pip install -r requirements.txt
 pip install -e .
 ```

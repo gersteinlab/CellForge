@@ -3,7 +3,7 @@ title: "CellForge: Open-Ended Autonomous Design of Computational Methods for Sin
 message: "If you use CellForge, please cite the accompanying manuscript."
 type: software
 license: MIT
-repository-code: "https://github.com/GabbyKoki/cellforge-new"
+repository-code: "https://github.com/gersteinlab/CellForge"
 version: 0.1.0
 date-released: 2026-07-19
 authors:

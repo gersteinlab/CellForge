@@ -24,6 +24,12 @@ setup(
     name="cellforge",
     version="0.1.0",
     packages=find_packages(include=["cellforge", "cellforge.*"]),
+    include_package_data=True,
+    package_data={
+        "cellforge.autorun": ["*.md", "*.mjs"],
+        "cellforge.Code_Generation.legacy": ["*.md"],
+        "cellforge.legacy.rag_v1": ["*.md"],
+    },
     py_modules=["main"],
     entry_points={"console_scripts": ["cellforge=main:cli_entrypoint"]},
     install_requires=read_requirements(),
@@ -41,7 +47,7 @@ setup(
     description="Open-ended autonomous design of computational methods for single-cell omics via multi-agent collaboration",
     long_description=(ROOT / "README.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",
-    url="https://github.com/GabbyKoki/cellforge-new",
+    url="https://github.com/gersteinlab/CellForge",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Science/Research",
