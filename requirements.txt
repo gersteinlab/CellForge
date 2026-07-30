@@ -66,7 +66,7 @@ PyPDF2>=3.0.0
 pdfplumber>=0.10.0
 
 # Single Cell Analysis
-scanpy>=1.9.3
+scanpy>=1.11.5
 anndata>=0.9.2
 scib>=1.1.7
 gseapy>=1.1.0
