@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=65.5.1", "wheel>=0.38.4"]
+requires = ["setuptools>=83.0.0", "wheel>=0.38.4"]
 build-backend = "setuptools.build_meta"
 
 # Package metadata lives in setup.py so that requirements.txt stays the single
