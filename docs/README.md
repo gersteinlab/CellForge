@@ -3,6 +3,7 @@
 | Document | Read it when |
 |---|---|
 | [Quickstart](QUICKSTART.md) | You want a first run working, locally or on Slurm |
+| [Example outputs](../examples/outputs/) | You want to see what a run produces before paying for one |
 | [Architecture](ARCHITECTURE.md) | You want to know how the agents actually reach a decision |
 | [Results](RESULTS.md) | You want the benchmark numbers and how they were produced |
 | [Model cards](MODELS.md) | You want details of the six architectures CellForge designed |

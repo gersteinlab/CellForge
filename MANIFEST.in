@@ -16,6 +16,9 @@ recursive-include figs *.svg
 recursive-include docs *.md
 recursive-include examples *.md
 recursive-include examples *.txt
+recursive-include examples *.json
+recursive-include examples *.mmd
+recursive-include examples *.py
 recursive-include cellforge *.md
 recursive-include cellforge *.mjs
 recursive-include scripts *.py

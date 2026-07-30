@@ -1,0 +1,119 @@
+{
+  "_provenance": {
+    "kind": "reference_artifact",
+    "is_live_run_output": false,
+    "note": "Hand-written to match the schema produced by cellforge/Method_Design/refinement.py. Content grounded in arXiv:2508.02276. See ../PROVENANCE.md.",
+    "schema_source": "cellforge/Method_Design/refinement.py::RefinementAgent.final_plan",
+    "real_run_filename_pattern": "research_plan_YYYYmmdd_HHMMSS.json"
+  },
+  "task_type": "gene_knockout",
+  "model_architecture": {
+    "name": "CPA-X",
+    "family": "compositional autoencoder with adversarial disentanglement",
+    "rationale": "The unseen-perturbation split is the binding constraint. A free per-perturbation embedding table cannot satisfy it, because rows for held-out perturbations never receive gradient. Conditioning on the target gene's embedding, and tying that embedding to the decoder output weights, means every gene is trained by every reconstruction and a held-out target still has a meaningful representation at test time.",
+    "components": {
+      "encoder": {
+        "type": "MLP",
+        "input": "n_genes",
+        "hidden": [512, 512],
+        "output": "latent_dim=128",
+        "norm": "LayerNorm",
+        "activation": "ReLU",
+        "dropout": 0.1
+      },
+      "gene_embedding": {
+        "shape": ["n_genes", 128],
+        "tied_to": "decoder output projection",
+        "purpose": "single shared representation used both to condition the perturbation and to decode expression"
+      },
+      "perturbation_encoder": {
+        "type": "MLP",
+        "input": "gene_embedding[target]",
+        "hidden": [512],
+        "output": 128,
+        "combination": "sum over targets, which also covers combinatorial perturbations",
+        "control_behaviour": "zero vector; controls need no embedding"
+      },
+      "composition": "additive in latent space: z_basal + z_perturbation",
+      "decoder": {
+        "trunk": {"type": "MLP", "hidden": [512, 512], "output": 128},
+        "output_projection": "h @ gene_embedding.T + gene_bias"
+      },
+      "adversary": {
+        "type": "MLP",
+        "input": "basal latent",
+        "output": "n_training_perturbation_classes",
+        "purpose": "trained to recover the perturbation from the basal latent; the encoder is trained to defeat it"
+      }
+    },
+    "parameter_scale": "order 10^7"
+  },
+  "data_processing": {
+    "quality_control": {
+      "min_genes_per_cell": 200,
+      "max_mito_fraction": 0.2,
+      "min_cells_per_gene": 3
+    },
+    "normalization": {
+      "target_sum": 10000,
+      "transform": "log1p",
+      "skip_if_already_logged": true
+    },
+    "feature_selection": {
+      "method": "highly variable genes by variance",
+      "n_top_genes": 2000,
+      "constraint": "perturbation target genes are forced into the retained set regardless of variance rank, since the model conditions on the target's embedding"
+    },
+    "label_parsing": {
+      "convention": "TARGET+ctrl for single, TARGET_A+TARGET_B for combinatorial",
+      "control_tokens": ["ctrl", "control", "nt", "non-targeting"]
+    }
+  },
+  "training_strategy": {
+    "objective": "MSE reconstruction loss minus adv_weight * adversary cross-entropy",
+    "optimizers": [
+      {"name": "main", "algorithm": "Adam", "lr": 0.001, "weight_decay": 1e-06, "params": "all except adversary"},
+      {"name": "adversary", "algorithm": "Adam", "lr": 0.001, "params": "adversary only"}
+    ],
+    "adv_weight": 0.5,
+    "batch_size": 256,
+    "max_epochs": 200,
+    "early_stopping": {"monitor": "validation reconstruction MSE", "patience": 20, "validation_fraction": 0.1},
+    "seeds": [0, 1, 2],
+    "expected_runtime": "4-8 hours on one GPU for the full dataset"
+  },
+  "evaluation_metrics": {
+    "genome_wide": ["MSE", "PCC", "R2"],
+    "differentially_expressed": ["MSE_DE", "PCC_DE", "R2_DE"],
+    "primary": "DE-restricted metrics; genome-wide figures are dominated by the unperturbed baseline and are sanity checks rather than results",
+    "de_definition": {
+      "test": "wilcoxon_rank_sum",
+      "correction": "benjamini_hochberg",
+      "adjusted_p_threshold": 0.05,
+      "abs_log2fc_threshold": 0.5
+    },
+    "scenarios": ["unseen_perturbation", "unseen_context"],
+    "aggregation": "perturbation-centric: score each perturbation once, then average over perturbations",
+    "folds": 5,
+    "runs_per_fold": 3,
+    "required_baselines": ["unperturbed control mean", "linear regression", "CPA", "scGen", "GEARS"],
+    "known_metric_behaviour": "R2_DE can legitimately be negative: the DE subset is selected for having moved and therefore has low residual variance."
+  },
+  "implementation_details": {
+    "entrypoint": "result.py",
+    "interface": "command line",
+    "outputs": ["metrics.json"],
+    "acceptance_criteria": [
+      "python result.py --help exits 0 without third-party dependencies installed",
+      "python result.py --selftest exits 0",
+      "metrics.json parses as a JSON object and contains model, dataset, split, metrics, per_perturbation, de_definition, averaging"
+    ],
+    "determinism": "fixed seed controls data generation, splitting, initialisation, and batching",
+    "dependency_policy": "torch, numpy and anndata imported lazily inside the functions that need them, so --help and --selftest work in a bare interpreter",
+    "estimator": {
+      "default": "delta",
+      "definition": "prediction = observed control mean + mean(decode(z+p) - decode(z))",
+      "rationale": "decoding the same basal latent with and without the perturbation isolates the shift and cancels systematic reconstruction bias, which would otherwise contaminate every gene and swamp the comparatively small differential signal"
+    }
+  }
+}

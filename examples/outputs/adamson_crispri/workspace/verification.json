@@ -1,0 +1,72 @@
+{
+  "checks": [
+    {
+      "command": null,
+      "details": {},
+      "exit_code": null,
+      "message": "Required file exists: result.py",
+      "name": "file_exists:result.py",
+      "passed": true,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "py_compile",
+        "result.py"
+      ],
+      "details": {},
+      "exit_code": 0,
+      "message": "Command completed successfully",
+      "name": "python_compile",
+      "passed": true,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "command": [
+        "python3",
+        "result.py",
+        "--help"
+      ],
+      "details": {},
+      "exit_code": 0,
+      "message": "Command completed successfully",
+      "name": "cli_help",
+      "passed": true,
+      "stderr_tail": "",
+      "stdout_tail": " delta)\n\ntraining:\n  --epochs EPOCHS\n  --batch-size BATCH_SIZE\n  --lr LR\n  --weight-decay WEIGHT_DECAY\n  --patience PATIENCE   Early-stopping patience in epochs (0 disables).\n                        (default: 20)\n  --seed SEED\n  --device {auto,cpu,cuda}\n\noutput:\n  --out OUT             Directory for metrics.json and checkpoints. (default:\n                        run)\n  --save-checkpoint\n  --quiet\n"
+    },
+    {
+      "command": [
+        "python3",
+        "result.py",
+        "--selftest"
+      ],
+      "details": {},
+      "exit_code": 0,
+      "message": "Command completed successfully",
+      "name": "acceptance_selftest",
+      "passed": true,
+      "stderr_tail": "",
+      "stdout_tail": "selftest: OK\n"
+    },
+    {
+      "command": null,
+      "details": {
+        "missing_fields": []
+      },
+      "exit_code": null,
+      "message": "Result JSON satisfies the required structure",
+      "name": "result_json",
+      "passed": true,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "entrypoint": "result.py",
+  "passed": true,
+  "workspace": "$WORKSPACE"
+}

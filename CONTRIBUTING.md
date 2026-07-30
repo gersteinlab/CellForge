@@ -107,6 +107,29 @@ Use the [bad research plan](.github/ISSUE_TEMPLATE/bad_plan.yml) template. A run
 completed successfully but produced wrong science is more informative than a crash,
 and we have nowhere else to get that data.
 
+### 6. Contribute a real example bundle
+
+[`examples/outputs/`](examples/outputs/) currently holds a *reference* bundle: the
+documents are hand-written to match the schemas the code emits, because whoever
+assembled it had no provider key and no downloaded dataset. A bundle from a genuine run
+is strictly better, and replacing it is one of the most useful things you can do for
+new users — it is the page people read while deciding whether to try this at all.
+
+```bash
+python scripts/export_example_run.py --dataset <name> --out examples/outputs/<name>
+```
+
+The script collects the artifacts, strips API keys, absolute paths, usernames and
+hostnames, and leaves a `PROVENANCE.md` stub. Two rules:
+
+- **Complete the provenance stub.** State what produced each file and what data the
+  metrics came from. An unedited stub will be rejected.
+- **Re-read every file yourself.** Scrubbing is best-effort, not a guarantee. Agent
+  traces can echo secrets in shapes no regex anticipates.
+
+If your metrics came from a subsample or from synthetic data, say so plainly rather than
+letting them read as benchmark results.
+
 ---
 
 ## Changes to agent behaviour

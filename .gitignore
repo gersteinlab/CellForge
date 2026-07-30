@@ -211,6 +211,11 @@ logs/
 knowledge_base/papers/
 node_modules/
 
+# The committed reference bundle under examples/outputs/ is documentation, not a
+# local artifact. Git will not descend into a directory excluded by `outputs/`,
+# so the directory itself has to be re-included before anything inside it can be.
+!examples/outputs/
+
 # Large analysis assets should be distributed separately.
 *.h5ad
 *.h5

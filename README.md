@@ -164,6 +164,34 @@ Debate runs until every agent clears $c \ge 0.8$ **and** the widest pairwise gap
 
 ---
 
+## 👀 See the output before you spend a token
+
+A complex run costs roughly 80k prompt / 400k completion tokens, plus 4–8 GPU-hours if you train what it writes. You should be able to look at the deliverables first.
+
+**[`examples/outputs/`](examples/outputs/)** is a complete worked bundle for the Adamson CRISPRi task — the task analysis, the research plan, and the training script, laid out exactly as a run leaves them:
+
+| Stage | Artifact | |
+|---|---|---|
+| Task Analysis | [`task_analysis_report.md`](examples/outputs/adamson_crispri/analyses/task_analysis_report.md) | dataset, problem, baselines, agent refinement round |
+| Method Design | [`research_plan.md`](examples/outputs/adamson_crispri/plans/research_plan.md) | architecture + protocol — 👤 **your approval gate** |
+| Code Generation | [`result.py`](examples/outputs/adamson_crispri/workspace/result.py) | runnable training script — 👤 **approval before any GPU job** |
+| Verification | [`verification.json`](examples/outputs/adamson_crispri/workspace/verification.json) | the deterministic, non-LLM acceptance check |
+
+```bash
+cd examples/outputs/adamson_crispri/workspace
+python result.py --help        # no third-party dependencies needed
+python result.py --selftest
+```
+
+> [!IMPORTANT]
+> **The two documents are reference artifacts, not transcripts of a live run.** They are written to match the schemas the code serialises, section for section. `result.py` is real, working, verified code, and its `metrics.json` is the genuine output of really running it — on **synthetic** data, so those numbers are a smoke test and nothing more.
+>
+> Every file's provenance is stated individually in [`PROVENANCE.md`](examples/outputs/adamson_crispri/PROVENANCE.md). Real benchmark numbers are in [docs/RESULTS.md](docs/RESULTS.md).
+>
+> Have you run the pipeline for real? [`scripts/export_example_run.py`](scripts/export_example_run.py) packages and scrubs a run into a bundle — a real one should replace this, and we would take that PR gladly.
+
+---
+
 ## 🔬 What CellForge designed
 
 Six datasets in, six architectures out. None were templates — each was specified by the agents, then implemented and trained end to end. Full model cards: [docs/MODELS.md](docs/MODELS.md).
@@ -264,6 +292,7 @@ For a cheap smoke test: `MODEL_NAME=gpt-4o-mini` with `METHOD_DESIGN_MAX_ROUNDS=
 | | |
 |---|---|
 | [**Quickstart**](docs/QUICKSTART.md) | Install, configure, first run, Slurm |
+| [**Example outputs**](examples/outputs/) | What the pipeline actually hands you, stage by stage |
 | [**Architecture**](docs/ARCHITECTURE.md) | The stages, agent roster, coordination score, ablations |
 | [**Results**](docs/RESULTS.md) | Full benchmark tables, all metrics, all baselines, judge study |
 | [**Model cards**](docs/MODELS.md) | The six generated architectures in detail |

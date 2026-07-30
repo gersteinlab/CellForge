@@ -1,0 +1,56 @@
+%% Reference artifact — not the output of a live run. See ../PROVENANCE.md.
+%% A real run writes this as research_plan_YYYYmmdd_HHMMSS.mmd.
+graph TD
+    subgraph Data["Data Processing"]
+        RAW["Adamson CRISPRi<br/>~111k cells x ~33k genes<br/>GSE90546"]
+        QC["Quality control<br/>min 200 genes/cell<br/>mito &lt; 0.2"]
+        NORM["Library-size normalise to 1e4<br/>then log1p"]
+        HVG["Highly variable genes (2000)<br/>+ forced target genes"]
+        LBL["Parse TARGET+ctrl labels<br/>into gene indices"]
+        RAW --> QC --> NORM --> HVG --> LBL
+    end
+
+    subgraph Model["CPA-X"]
+        ENC["Encoder MLP<br/>n_genes -> 512 -> 512 -> 128"]
+        BASAL["Basal latent z"]
+        GEMB["Gene embedding<br/>n_genes x 128<br/>(tied to decoder)"]
+        PENC["Perturbation encoder<br/>128 -> 512 -> 128"]
+        PLAT["Perturbation latent p<br/>(zero for controls)"]
+        ADD["Compose z + p"]
+        DEC["Decoder trunk<br/>128 -> 512 -> 512 -> 128"]
+        OUT["h @ gene_embedding.T + bias"]
+        ADV["Adversary<br/>128 -> 512 -> n_classes"]
+
+        ENC --> BASAL
+        GEMB --> PENC --> PLAT
+        BASAL --> ADD
+        PLAT --> ADD
+        ADD --> DEC --> OUT
+        GEMB -.tied weights.-> OUT
+        BASAL -.adversarial<br/>disentanglement.-> ADV
+    end
+
+    subgraph Train["Training"]
+        LOSS["MSE reconstruction<br/>- 0.5 x adversary CE"]
+        OPT["Adam lr 1e-3<br/>batch 256, max 200 epochs"]
+        ES["Early stop: patience 20<br/>on 10% validation slice"]
+        LOSS --> OPT --> ES
+    end
+
+    subgraph Eval["Evaluation"]
+        SPLIT["5 folds x 3 seeds<br/>unseen_perturbation<br/>unseen_context"]
+        PRED["Delta estimator:<br/>control mean + mean(decode(z+p) - decode(z))"]
+        DE["DE genes: Wilcoxon + BH<br/>adj p &lt; 0.05, |log2FC| &gt; 0.5"]
+        MET["MSE / PCC / R2<br/>genome-wide and DE-restricted"]
+        AGG["Perturbation-centric averaging"]
+        BASE["Baselines: control mean, linear,<br/>CPA, scGen, GEARS"]
+        SPLIT --> PRED --> DE --> MET --> AGG
+        BASE --> AGG
+    end
+
+    LBL --> ENC
+    LBL --> GEMB
+    OUT --> LOSS
+    ADV --> LOSS
+    ES --> SPLIT
+    AGG --> RESULT["metrics.json"]
