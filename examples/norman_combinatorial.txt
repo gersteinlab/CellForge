@@ -1,0 +1,32 @@
+Develop a predictive model for combinatorial CRISPR activation (CRISPRa) in K562 cells,
+using the dataset from Norman et al. (2019, Science).
+
+Task definition:
+- Input: the baseline gene expression profile of an unperturbed K562 cell, together
+  with the identity of one or two genes targeted for transcriptional activation.
+- Output: the predicted log-normalised gene expression profile after perturbation,
+  across all measured genes.
+
+Evaluation scenarios:
+1. Unseen single perturbations — target genes absent from training entirely.
+2. Unseen gene pairs — combinations held out from training where each constituent gene
+   may have been observed individually. This is the primary scenario.
+3. Unseen cell contexts — baseline profiles not observed during training.
+
+Metrics, reported both genome-wide and restricted to differentially expressed genes:
+- MSE, PCC, R2.
+
+Differentially expressed genes are defined per perturbation by a Wilcoxon rank-sum test
+against control cells with Benjamini-Hochberg correction, keeping genes with adjusted
+p < 0.05 and |log2 fold change| > 0.5.
+
+The scientific crux:
+The combined effect of activating genes A and B together is frequently NOT the sum of
+activating each alone. Synergy and antagonism are common and are the interesting part
+of this dataset. A model that assumes additivity in latent space will score acceptably
+on average and fail precisely on the perturbations that matter. The design must be able
+to represent non-additive interaction between the two activated genes explicitly, and
+the evaluation should report performance on strongly non-additive pairs separately from
+the overall average.
+
+Average metrics per perturbation rather than per cell.

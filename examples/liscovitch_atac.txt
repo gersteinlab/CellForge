@@ -1,0 +1,34 @@
+Develop a predictive model for chromatin accessibility response to CRISPR perturbation
+in K562 cells, using the single-cell ATAC-seq dataset from Liscovitch-Brauer et al.
+(2021, Nature Biotechnology).
+
+Task definition:
+- Input: the baseline chromatin accessibility profile of an unperturbed K562 cell
+  across approximately 200,000 peaks, together with the identity of the CRISPR target.
+- Output: the predicted post-perturbation accessibility profile across all peaks.
+
+Evaluation scenarios:
+1. Unseen perturbations — CRISPR targets absent from training.
+2. Unseen cell contexts — baseline accessibility profiles not observed during training.
+
+Metrics:
+- ROC-AUC and PR-AUC over peak accessibility. These are the primary metrics.
+- Recall of peaks whose accessibility changes significantly under the perturbation.
+- Report PR-AUC prominently: with this degree of class imbalance ROC-AUC alone looks
+  flattering and hides poor performance on the peaks that actually move.
+
+Task-specific considerations:
+- The feature space is roughly an order of magnitude wider than the transcriptomic
+  tasks and is extremely sparse. Per-cell coverage is low, so a single observed cell
+  gives a very noisy view of its own accessibility landscape.
+- Accessibility is near-binary rather than continuous. Regression losses designed for
+  log-normalised expression are a poor fit; the loss should reflect the actual data
+  type.
+- A model that collapses toward the marginal accessibility profile — predicting the
+  population average regardless of perturbation — will score deceptively well on
+  aggregate metrics. The evaluation must be able to detect that failure mode, for
+  example by reporting performance restricted to differentially accessible peaks.
+- Peaks are not independent; accessibility is spatially correlated along the genome and
+  organised into domains. The design may exploit that structure.
+
+Average metrics per perturbation rather than per cell.

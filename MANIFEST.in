@@ -1,11 +1,21 @@
 include README.md
+include CHANGELOG.md
+include CONTRIBUTING.md
+include CODE_OF_CONDUCT.md
+include SECURITY.md
 include LICENSE
 include CITATION.cff
 include requirements.txt
+include requirements-ci.txt
+include pyproject.toml
 include setup.py
 include config.json
 include .env.example
 recursive-include figs *.png
+recursive-include figs *.svg
+recursive-include docs *.md
+recursive-include examples *.md
+recursive-include examples *.txt
 recursive-include cellforge *.md
 recursive-include cellforge *.mjs
 recursive-include scripts *.py

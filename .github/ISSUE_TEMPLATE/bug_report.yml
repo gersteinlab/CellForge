@@ -1,0 +1,81 @@
+name: 🐛 Bug report
+description: Something in CellForge broke or behaved unexpectedly
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a report. The single most useful thing you can attach is the
+        contents of `cellforge --doctor` plus the failing artifact (analysis report,
+        research plan, or `result.py`).
+
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Which stage failed?
+      options:
+        - task_analysis
+        - method_design
+        - code_generation
+        - autorun
+        - installation / setup
+        - not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you expect, and what did you get instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Command you ran
+      description: The exact `cellforge ...` invocation, with any secrets redacted.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `cellforge --doctor`
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: traceback
+    attributes:
+      label: Traceback or error output
+      render: shell
+
+  - type: input
+    id: model
+    attributes:
+      label: LLM provider and model
+      placeholder: "e.g. openai / gpt-4o-mini, or anthropic / claude-sonnet-4"
+    validations:
+      required: true
+
+  - type: input
+    id: env
+    attributes:
+      label: Python version and OS
+      placeholder: "e.g. Python 3.11.6, Ubuntu 22.04"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this is not a duplicate
+          required: true
+        - label: I removed API keys and other secrets from everything I pasted
+          required: true

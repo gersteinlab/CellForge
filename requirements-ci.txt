@@ -1,0 +1,18 @@
+# Minimal dependency set required to import cellforge and run `pytest tests`.
+#
+# The full requirements.txt pulls scanpy, scvi-tools, transformers, and the rest
+# of the scientific stack, which takes several minutes to resolve and is not
+# needed for the unit suite. CI installs this file instead; torch is installed
+# separately from the CPU wheel index by .github/workflows/ci.yml.
+#
+# If you add a test that needs a heavier dependency, add it here too.
+
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+
+numpy>=1.24.3,<2.0.0
+requests>=2.31.0
+python-dotenv>=0.19.0
+pyyaml>=6.0.1
+anndata>=0.9.2
+networkx>=2.8.8

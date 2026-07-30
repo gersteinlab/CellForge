@@ -1,0 +1,33 @@
+Develop a predictive model that estimates the gene expression profile of individual
+K562 cells following CRISPR interference (CRISPRi), using the dataset from Adamson et
+al. (2016, Cell).
+
+Task definition:
+- Input: the baseline gene expression profile of an unperturbed K562 cell, together
+  with the identity of the target gene knocked down by CRISPRi.
+- Output: the predicted log-normalised gene expression profile of that cell after
+  perturbation, across all measured genes.
+
+Evaluation scenarios:
+1. Unseen perturbations — predict the effect of target genes that were entirely absent
+   from training.
+2. Unseen cell contexts — predict responses in cells whose baseline expression profiles
+   were not observed during training.
+
+Metrics, reported both genome-wide and restricted to differentially expressed genes:
+- MSE — mean squared error between predicted and observed expression.
+- PCC — Pearson correlation between predicted and observed profiles.
+- R2 — proportion of observed variance explained by the prediction.
+
+Differentially expressed genes are defined per perturbation by a Wilcoxon rank-sum test
+against control cells with Benjamini-Hochberg correction, keeping genes with adjusted
+p < 0.05 and |log2 fold change| > 0.5.
+
+Additional constraints:
+- Average metrics per perturbation, not per cell, so that heavily sampled perturbations
+  do not dominate the score.
+- Cell-state and batch variation must not leak into the perturbation representation;
+  the model has to compose a perturbation onto a cell context it has not seen paired
+  with that perturbation before.
+- Report a comparison against at least the unperturbed-profile control baseline, so it
+  is clear the model beats predicting no change.

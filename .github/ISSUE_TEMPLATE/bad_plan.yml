@@ -1,0 +1,50 @@
+name: 🧪 Bad research plan or model
+description: CellForge ran fine but produced a scientifically wrong plan, architecture, or result
+labels: ["research-quality", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        These reports are genuinely valuable — a run that completed successfully but
+        produced bad science tells us more than a crash does. Please attach the plan.
+
+  - type: textarea
+    id: task
+    attributes:
+      label: The task description you gave CellForge
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    id: dataset
+    attributes:
+      label: Dataset
+      placeholder: "e.g. Norman 2019 (GSE133344), or a description of your own data"
+    validations:
+      required: true
+
+  - type: textarea
+    id: plan
+    attributes:
+      label: The research plan it produced
+      description: Paste the plan from `data/plans/<dataset>/`, or attach the file.
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is scientifically wrong with it
+      description: |
+        Be specific. "The model conditions on the perturbation label but the split
+        holds out unseen perturbations, so this leaks" is far more actionable than
+        "the plan is bad."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What a competent human would have proposed instead

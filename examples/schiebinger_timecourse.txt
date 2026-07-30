@@ -1,0 +1,36 @@
+Develop a predictive model for cytokine-stimulated cellular response over a time
+course, using the dataset from Schiebinger et al. (2019, Cell).
+
+Task definition:
+- Input: the baseline gene expression profile of an unstimulated cell, the identity of
+  the cytokine stimulus, and a target time point.
+- Output: the predicted expression profile of the cell at that time point.
+
+Evaluation scenarios:
+1. Unseen time points — interpolate to a time between two measured points, and
+   extrapolate beyond the last measured point. Report these separately; extrapolation
+   is expected to be substantially harder.
+2. Unseen stimuli — cytokines absent from training.
+3. Unseen cell contexts — baseline profiles not observed during training.
+
+Metrics, reported both genome-wide and restricted to differentially expressed genes:
+- MSE, PCC, R2
+- DEG Recall: the fraction of truly differentially expressed genes the model recovers.
+  This is the primary metric for this task.
+
+Differentially expressed genes are defined per stimulus-time condition by a Wilcoxon
+rank-sum test against unstimulated controls with Benjamini-Hochberg correction, keeping
+genes with adjusted p < 0.05 and |log2 fold change| > 0.5.
+
+The scientific crux:
+Time is continuous and ordered. Treating each measured time point as an independent
+categorical class discards the ordering, discards the unequal spacing between
+measurements, and makes interpolation to an unmeasured time impossible. The design must
+condition on time as a continuous covariate and should be able to represent the
+trajectory a cell follows, not just a set of independent snapshots.
+
+Cellular responses to cytokine stimulation are transient: genes induced early may be
+back at baseline later. A model that predicts a monotonic response will be wrong in a
+specific and identifiable way, and the evaluation should surface that.
+
+Average metrics per stimulus-time condition rather than per cell.

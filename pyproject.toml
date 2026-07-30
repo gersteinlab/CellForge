@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=65.5.1", "wheel>=0.38.4"]
+build-backend = "setuptools.build_meta"
+
+# Package metadata lives in setup.py so that requirements.txt stays the single
+# source of truth for runtime dependencies. This file carries build and tooling
+# configuration only.
+
+[tool.black]
+line-length = 100
+target-version = ["py39", "py310", "py311", "py312"]
+extend-exclude = '''
+/(
+    cellforge/legacy
+  | cellforge/Code_Generation/legacy
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+skip_glob = ["*/legacy/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "slow: tests that take more than a few seconds",
+    "network: tests that require outbound network access",
+    "llm: tests that require a live LLM provider key",
+]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_unused_configs = true
+ignore_missing_imports = true
+exclude = ["cellforge/legacy/", "cellforge/Code_Generation/legacy/"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+exclude = ["cellforge/legacy", "cellforge/Code_Generation/legacy"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E501"]

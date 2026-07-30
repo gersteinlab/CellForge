@@ -1,0 +1,37 @@
+Develop a predictive model that jointly estimates transcriptome and surface-protein
+response to CRISPR perturbation, using the ECCITE-seq dataset from Papalexi et al.
+(2021, Nature Genetics).
+
+Task definition:
+- Input: the baseline profile of an unperturbed cell — both RNA and surface protein —
+  together with the identity of the CRISPR target gene.
+- Output: the predicted post-perturbation profile in BOTH modalities: log-normalised
+  expression across all measured genes, and abundance across the ~200 measured surface
+  proteins.
+
+Evaluation scenarios:
+1. Unseen perturbations — target genes absent from training.
+2. Unseen cell contexts — baseline profiles not observed during training.
+
+Metrics, reported separately for the RNA readout and the protein readout, and for each
+both across all features and restricted to differentially expressed features:
+- MSE, PCC, R2
+- Recall of differentially expressed features. Protein recall is the primary metric and
+  the hardest part of this task.
+
+Differentially expressed features are defined per perturbation by a Wilcoxon rank-sum
+test against control cells with Benjamini-Hochberg correction, keeping features with
+adjusted p < 0.05 and |log2 fold change| > 0.5.
+
+Task-specific considerations:
+- The two modalities have different noise models and very different dynamic ranges. RNA
+  counts are sparse and over-dispersed; protein counts from antibody-derived tags are
+  denser but carry substantial background. A single shared output head forces a bad
+  compromise between the two.
+- Protein abundance is not a deterministic function of its own transcript. Translation,
+  degradation, and trafficking all intervene. The model should be able to learn the
+  relationship between the modalities rather than assume it.
+- Known gene-gene interaction structure may be used to propagate perturbation effects,
+  if the design can justify the choice of network.
+
+Average metrics per perturbation rather than per cell.

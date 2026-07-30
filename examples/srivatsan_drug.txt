@@ -1,0 +1,32 @@
+Develop a predictive model for small-molecule drug response at single-cell resolution,
+using the sci-Plex 3 dataset from Srivatsan et al. (2020, Science).
+
+Task definition:
+- Input: the baseline gene expression profile of an untreated cell, the identity of a
+  compound, and the applied dose.
+- Output: the predicted expression response after treatment.
+
+Evaluation scenarios:
+1. Unseen compounds — molecules absent from training.
+2. Unseen doses — dose levels for a compound seen at other concentrations.
+3. Unseen cell contexts — baseline profiles not observed during training.
+
+Metrics, reported both genome-wide and restricted to differentially expressed genes:
+- MSE, PCC, R2.
+
+Differentially expressed genes are defined per compound-dose condition by a Wilcoxon
+rank-sum test against vehicle controls with Benjamini-Hochberg correction, keeping
+genes with adjusted p < 0.05 and |log2 fold change| > 0.5.
+
+Task-specific considerations:
+- Dose is continuous and its effect is typically non-linear and saturating. Treating
+  dose as a categorical label discards that structure and cannot interpolate to an
+  untested concentration.
+- Drug response is heterogeneous across cells within the same well. A point estimate of
+  the mean response hides that heterogeneity; a model that outputs a conditional
+  distribution over responses, rather than a single profile, is preferred, and the
+  evaluation should assess distributional fit and not only the mean.
+- Chemical structure information may be used to generalise across compounds, if the
+  design can justify it.
+
+Average metrics per compound-dose condition rather than per cell.

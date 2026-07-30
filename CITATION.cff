@@ -1,10 +1,95 @@
 cff-version: 1.2.0
-title: "CellForge: Open-Ended Autonomous Design of Computational Methods for Single-Cell Omics via Multi-Agent Collaboration"
-message: "If you use CellForge, please cite the accompanying manuscript."
+title: "CellForge: Agentic Design of Virtual Cell Models"
+message: "If you use CellForge, please cite both the software and the preprint below."
 type: software
 license: MIT
 repository-code: "https://github.com/gersteinlab/CellForge"
+url: "https://github.com/gersteinlab/CellForge"
 version: 0.1.0
 date-released: 2026-07-19
+abstract: >-
+  CellForge is a multi-agent framework that autonomously designs computational
+  methods for single-cell omics. Given a dataset and a research question, it
+  performs literature-grounded task analysis, coordinates domain-expert agents
+  through a peer-review debate to converge on a model architecture, and
+  generates verified, executable training code.
+keywords:
+  - single-cell omics
+  - virtual cell models
+  - perturbation prediction
+  - multi-agent systems
+  - large language models
+  - automated machine learning
+  - computational biology
 authors:
-  - name: "CellForge authors"
+  - family-names: Tang
+    given-names: Xiangru
+  - family-names: Yu
+    given-names: Zhuoyun
+  - family-names: Chen
+    given-names: Jiapeng
+  - family-names: Cui
+    given-names: Yan
+  - family-names: Shao
+    given-names: Daniel
+  - family-names: Wang
+    given-names: Weixu
+  - family-names: Wu
+    given-names: Fang
+  - family-names: Zhuang
+    given-names: Yuchen
+  - family-names: Shi
+    given-names: Wenqi
+  - family-names: Huang
+    given-names: Zhi
+  - family-names: Cohan
+    given-names: Arman
+  - family-names: Lin
+    given-names: Xihong
+  - family-names: Theis
+    given-names: Fabian
+  - family-names: Krishnaswamy
+    given-names: Smita
+  - family-names: Gerstein
+    given-names: Mark
+preferred-citation:
+  type: article
+  title: "CellForge: Agentic Design of Virtual Cell Models"
+  year: 2025
+  journal: "arXiv preprint arXiv:2508.02276"
+  url: "https://arxiv.org/abs/2508.02276"
+  identifiers:
+    - type: other
+      value: "arXiv:2508.02276"
+      description: arXiv identifier
+  authors:
+    - family-names: Tang
+      given-names: Xiangru
+    - family-names: Yu
+      given-names: Zhuoyun
+    - family-names: Chen
+      given-names: Jiapeng
+    - family-names: Cui
+      given-names: Yan
+    - family-names: Shao
+      given-names: Daniel
+    - family-names: Wang
+      given-names: Weixu
+    - family-names: Wu
+      given-names: Fang
+    - family-names: Zhuang
+      given-names: Yuchen
+    - family-names: Shi
+      given-names: Wenqi
+    - family-names: Huang
+      given-names: Zhi
+    - family-names: Cohan
+      given-names: Arman
+    - family-names: Lin
+      given-names: Xihong
+    - family-names: Theis
+      given-names: Fabian
+    - family-names: Krishnaswamy
+      given-names: Smita
+    - family-names: Gerstein
+      given-names: Mark
