@@ -29,7 +29,7 @@ pyyaml>=6.0.1
 json5>=0.9.14
 jsonschema>=4.22.0
 jsonschema-specifications>=2023.7.1
-referencing>=0.30.2
+referencing>=0.37.0
 rpds-py>=0.10.3
 
 # Scientific Computing
