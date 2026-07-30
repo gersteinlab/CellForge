@@ -120,7 +120,7 @@ jupyterlab-pygments>=0.2.2
 markupsafe>=2.1.3
 mistune>=3.0.1
 nbclient>=0.8.0
-pandocfilters>=1.5.0
+pandocfilters>=1.5.1
 pygments>=2.15.1
 tinycss2>=1.2.1
 
