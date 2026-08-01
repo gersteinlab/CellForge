@@ -1,5 +1,5 @@
 # Core Dependencies
-setuptools>=65.5.1
+setuptools>=83.0.0
 wheel>=0.38.4
 pip>=23.0.1
 packaging>=23.0
