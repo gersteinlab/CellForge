@@ -20,7 +20,7 @@ yarl>=1.8.2
 aiofiles>=23.1.0
 attrs>=23.1.0
 tenacity>=8.2.0,!=8.4.0,<10.0.0
-idna>=3.6
+idna>=3.19
 certifi>=2023.7.22
 
 # Configuration & File Handling
