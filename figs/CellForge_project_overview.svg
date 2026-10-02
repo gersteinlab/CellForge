@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1050" viewBox="0 0 1800 1050" role="img" aria-labelledby="title desc">
+  <title id="title">CellForge project overview</title>
+  <desc id="desc">A workflow illustration showing CellForge inputs, task analysis, method design, code generation backends, autorun execution, and outputs for single-cell omics method development.</desc>
+  <defs>
+    <style>
+      .bg { fill: #f7f9fb; }
+      .title { font: 700 48px Arial, Helvetica, sans-serif; fill: #16202a; }
+      .subtitle { font: 400 24px Arial, Helvetica, sans-serif; fill: #4d5b68; }
+      .label { font: 700 25px Arial, Helvetica, sans-serif; fill: #182432; }
+      .small { font: 400 19px Arial, Helvetica, sans-serif; fill: #4d5b68; }
+      .tiny { font: 400 16px Arial, Helvetica, sans-serif; fill: #52606d; }
+      .phase { fill: #ffffff; stroke: #c8d2dc; stroke-width: 2; rx: 18; }
+      .input { fill: #fef7e6; stroke: #e2b450; stroke-width: 2; rx: 18; }
+      .output { fill: #ebf8f3; stroke: #63b391; stroke-width: 2; rx: 18; }
+      .backend { fill: #eef3ff; stroke: #7997d8; stroke-width: 2; rx: 14; }
+      .legacy { fill: #f3f0f7; stroke: #a992c5; stroke-width: 2; rx: 14; stroke-dasharray: 8 7; }
+      .core { fill: #1e5b7a; stroke: #0f3449; stroke-width: 2; rx: 24; }
+      .coreText { font: 700 30px Arial, Helvetica, sans-serif; fill: #ffffff; }
+      .coreSmall { font: 400 18px Arial, Helvetica, sans-serif; fill: #d9edf5; }
+      .arrow { stroke: #405261; stroke-width: 4; fill: none; marker-end: url(#arrow); }
+      .arrowLight { stroke: #7c8b97; stroke-width: 3; fill: none; marker-end: url(#arrowLight); }
+      .tag { font: 700 15px Arial, Helvetica, sans-serif; fill: #ffffff; }
+      .tagBox { fill: #46718a; rx: 9; }
+      .section { font: 700 18px Arial, Helvetica, sans-serif; fill: #24313d; letter-spacing: 0; }
+    </style>
+    <marker id="arrow" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto">
+      <path d="M 0 0 L 14 7 L 0 14 z" fill="#405261"/>
+    </marker>
+    <marker id="arrowLight" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M 0 0 L 12 6 L 0 12 z" fill="#7c8b97"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#1a2a36" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1800" height="1050"/>
+  <text class="title" x="90" y="82">CellForge</text>
+  <text class="subtitle" x="90" y="122">Open-ended autonomous design of computational methods for single-cell omics</text>
+
+  <rect class="tagBox" x="1415" y="58" width="295" height="34"/>
+  <text class="tag" x="1433" y="81">paper artifact workflow overview</text>
+
+  <rect class="input" filter="url(#shadow)" x="90" y="210" width="290" height="150"/>
+  <text class="label" x="125" y="255">Inputs</text>
+  <text class="small" x="125" y="292">Task description</text>
+  <text class="small" x="125" y="322">Single-cell dataset</text>
+  <text class="small" x="125" y="352">Optional literature/search APIs</text>
+
+  <rect class="phase" filter="url(#shadow)" x="470" y="188" width="285" height="195"/>
+  <text class="section" x="505" y="230">Phase 1</text>
+  <text class="label" x="505" y="265">Task Analysis</text>
+  <text class="small" x="505" y="304">Parse biological goal</text>
+  <text class="small" x="505" y="334">Inspect dataset metadata</text>
+  <text class="small" x="505" y="364">Build structured problem report</text>
+
+  <rect class="phase" filter="url(#shadow)" x="835" y="188" width="285" height="195"/>
+  <text class="section" x="870" y="230">Phase 2</text>
+  <text class="label" x="870" y="265">Method Design</text>
+  <text class="small" x="870" y="304">Multi-agent expert discussion</text>
+  <text class="small" x="870" y="334">Architecture and training plan</text>
+  <text class="small" x="870" y="364">Task-wise decomposition</text>
+
+  <rect class="phase" filter="url(#shadow)" x="1200" y="188" width="315" height="195"/>
+  <text class="section" x="1235" y="230">Phase 3</text>
+  <text class="label" x="1235" y="265">Code Generation</text>
+  <text class="small" x="1235" y="304">Backend registry</text>
+  <text class="small" x="1235" y="334">Plan to result.py</text>
+  <text class="small" x="1235" y="364">Autorun-compatible CLI</text>
+
+  <rect class="core" filter="url(#shadow)" x="655" y="470" width="490" height="150"/>
+  <text class="coreText" x="735" y="525">CellForge Agent Core</text>
+  <text class="coreSmall" x="720" y="565">LLM interfaces, retrieval, plan storage, discussion logic,</text>
+  <text class="coreSmall" x="790" y="595">and dataset-scoped output contracts</text>
+
+  <rect class="backend" x="1185" y="470" width="230" height="72"/>
+  <text class="label" x="1225" y="515">Codex</text>
+  <text class="tiny" x="1225" y="538">default clean backend</text>
+
+  <rect class="legacy" x="1310" y="585" width="230" height="72"/>
+  <text class="label" x="1348" y="630">OpenHands</text>
+  <text class="tiny" x="1348" y="653">legacy adapter</text>
+
+  <rect class="phase" filter="url(#shadow)" x="690" y="730" width="420" height="160"/>
+  <text class="section" x="730" y="772">Optional Phase 4</text>
+  <text class="label" x="730" y="808">Autorun</text>
+  <text class="small" x="730" y="846">Split tasks, generate task code, optimize,</text>
+  <text class="small" x="730" y="876">run locally or submit SLURM jobs</text>
+
+  <rect class="output" filter="url(#shadow)" x="1225" y="725" width="360" height="175"/>
+  <text class="label" x="1265" y="770">Outputs</text>
+  <text class="small" x="1265" y="810">Task analysis JSON/Markdown</text>
+  <text class="small" x="1265" y="840">Research plans and diagrams</text>
+  <text class="small" x="1265" y="870">Generated code and metrics</text>
+
+  <rect class="output" filter="url(#shadow)" x="210" y="725" width="360" height="175"/>
+  <text class="label" x="250" y="770">Submission Repo</text>
+  <text class="small" x="250" y="810">Clean source code</text>
+  <text class="small" x="250" y="840">No credentials or large data</text>
+  <text class="small" x="250" y="870">Tests, license, citation metadata</text>
+
+  <path class="arrow" d="M 380 285 H 455"/>
+  <path class="arrow" d="M 755 285 H 820"/>
+  <path class="arrow" d="M 1120 285 H 1185"/>
+  <path class="arrowLight" d="M 612 383 C 650 425, 690 445, 735 470"/>
+  <path class="arrowLight" d="M 977 383 C 970 420, 940 445, 920 470"/>
+  <path class="arrowLight" d="M 1358 383 C 1290 430, 1220 460, 1145 515"/>
+  <path class="arrowLight" d="M 1145 535 H 1175"/>
+  <path class="arrowLight" d="M 1415 506 H 1425"/>
+  <path class="arrowLight" d="M 1425 542 V 575"/>
+  <path class="arrow" d="M 900 620 V 715"/>
+  <path class="arrow" d="M 1110 810 H 1210"/>
+  <path class="arrowLight" d="M 690 810 H 585"/>
+
+  <text class="tiny" x="475" y="420">data/analyses/&lt;dataset&gt;</text>
+  <text class="tiny" x="835" y="420">data/plans/&lt;dataset&gt;</text>
+  <text class="tiny" x="1210" y="420">data/codes/&lt;dataset&gt;</text>
+  <text class="tiny" x="835" y="925">data/runs/&lt;dataset&gt;</text>
+</svg>

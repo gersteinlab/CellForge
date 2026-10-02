@@ -1,0 +1,46 @@
+name: 💡 Feature request
+description: Suggest a capability, dataset, baseline, or backend
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of addition?
+      options:
+        - New dataset / benchmark
+        - New baseline method
+        - New code-generation backend
+        - New literature-retrieval provider
+        - New evaluation metric
+        - Core framework change
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the situation you are stuck in, not just the feature you want.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed approach
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Contribution
+      options:
+        - label: I am willing to open a PR for this
