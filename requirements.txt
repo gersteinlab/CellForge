@@ -112,7 +112,7 @@ tqdm>=4.65.0
 # Web Scraping & Processing
 beautifulsoup4>=4.12.0
 requests-html>=0.10.0
-PyMuPDF>=1.22.3
+PyMuPDF>=1.28.2
 bleach>=6.0.0
 defusedxml>=0.7.1
 jinja2>=3.1.2
